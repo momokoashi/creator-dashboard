@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Creator Analytics Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Creator Dashboard</h1>
+        <button id="addCreatorBtn" class="btn btn-primary">+ Add Creator</button>
+      </div>
+      <div class="search-box">
+        <input type="text" id="searchCreators" placeholder="Search creators...">
+      </div>
+      <ul id="creatorList" class="creator-list"></ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Empty State -->
+      <div id="emptyState" class="empty-state">
+        <div class="empty-icon">&#128202;</div>
+        <h2>No Creator Selected</h2>
+        <p>Add a creator or select one from the sidebar to view analytics.</p>
+      </div>
+
+      <!-- Creator Detail View -->
+      <div id="creatorDetail" class="creator-detail" style="display:none;">
+        <!-- Header -->
+        <div class="detail-header">
+          <div class="creator-info">
+            <h2 id="detailName" class="creator-name"></h2>
+            <div class="creator-actions">
+              <button id="fetchDataBtn" class="btn btn-accent">Fetch Data</button>
+              <button id="captureScreenshotBtn" class="btn btn-secondary">Capture Screenshot</button>
+              <button id="editCreatorBtn" class="btn btn-secondary">Edit</button>
+              <button id="deleteCreatorBtn" class="btn btn-danger">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="detail-tabs">
+          <button class="tab-btn active" data-tab="analytics">Analytics</button>
+          <button class="tab-btn" data-tab="summary">Summary</button>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div class="tab-content active" id="tabAnalytics" data-tab="analytics">
+
+        <!-- Platform Cards -->
+        <div class="platform-cards" id="platformCards">
+          <!-- YouTube Card -->
+          <div class="platform-card" data-platform="youtube">
+            <div class="platform-header">
+              <span class="platform-icon yt-icon">&#9654;</span>
+              <h3>YouTube</h3>
+              <a id="ytLink" class="platform-link" target="_blank" title="Open profile">&#8599;</a>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="ytFollowers" class="stat-input" placeholder="—" data-field="followers">
+              </div>
+              <div class="stat">
+                <label>Engagement Rate</label>
+                <input type="text" id="ytEngagement" class="stat-input" placeholder="—" data-field="engagementRate">
+                <span class="stat-suffix">%</span>
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="ytAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="ytMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="ytMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- TikTok Card -->
+          <div class="platform-card" data-platform="tiktok">
+            <div class="platform-header">
+              <span class="platform-icon tt-icon">&#9835;</span>
+              <h3>TikTok</h3>
+              <a id="ttLink" class="platform-link" target="_blank" title="Open profile">&#8599;</a>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="ttFollowers" class="stat-input" placeholder="—" data-field="followers">
+              </div>
+              <div class="stat">
+                <label>Engagement Rate</label>
+                <input type="text" id="ttEngagement" class="stat-input" placeholder="—" data-field="engagementRate">
+                <span class="stat-suffix">%</span>
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="ttAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="ttMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="ttMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Instagram Card -->
+          <div class="platform-card" data-platform="instagram">
+            <div class="platform-header">
+              <span class="platform-icon ig-icon">&#128247;</span>
+              <h3>Instagram</h3>
+              <a id="igLink" class="platform-link" target="_blank" title="Open profile">&#8599;</a>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="igFollowers" class="stat-input" placeholder="—" data-field="followers">
+              </div>
+              <div class="stat">
+                <label>Engagement Rate</label>
+                <input type="text" id="igEngagement" class="stat-input" placeholder="—" data-field="engagementRate">
+                <span class="stat-suffix">%</span>
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="igAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="igMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="igMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- Podcast Card -->
+          <div class="platform-card" data-platform="podcast">
+            <div class="platform-header">
+              <span class="platform-icon pod-icon">&#127911;</span>
+              <h3>Podcast</h3>
+              <a id="podLink" class="platform-link" target="_blank" title="Open profile">&#8599;</a>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="podFollowers" class="stat-input" placeholder="—" data-field="followers">
+              </div>
+              <div class="stat">
+                <label>Engagement Rate</label>
+                <input type="text" id="podEngagement" class="stat-input" placeholder="—" data-field="engagementRate">
+                <span class="stat-suffix">%</span>
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="podAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="podMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="podMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Video Views Section -->
+        <div class="section">
+          <h3 class="section-title">Last 10 Videos/Posts (Excluding Pinned)</h3>
+          <div class="video-tables">
+            <div class="video-table-wrapper" id="videoTablesContainer">
+              <!-- Tables generated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- CPM Calculator -->
+        <div class="section cpm-section">
+          <h3 class="section-title">CPM Calculator</h3>
+          <div class="cpm-calculator">
+            <div class="cpm-input-row">
+              <div class="cpm-field">
+                <label>Total Cost ($)</label>
+                <input type="number" id="cpmCost" placeholder="e.g. 6000" min="0" step="100">
+              </div>
+              <div class="cpm-field">
+                <label>Select Platforms</label>
+                <div class="platform-toggles">
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmYoutube" value="youtube"> YouTube
+                  </label>
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmTiktok" value="tiktok"> TikTok
+                  </label>
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmInstagram" value="instagram"> Instagram
+                  </label>
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmPodcast" value="podcast"> Podcast
+                  </label>
+                </div>
+              </div>
+              <button id="calculateCpmBtn" class="btn btn-accent">Calculate CPM</button>
+            </div>
+
+            <div id="cpmResults" class="cpm-results" style="display:none;">
+              <div class="cpm-result-card">
+                <h4>Combined CPM (Average)</h4>
+                <div class="cpm-value" id="cpmAverage">—</div>
+                <div class="cpm-breakdown" id="cpmAvgBreakdown"></div>
+              </div>
+              <div class="cpm-result-card">
+                <h4>Combined CPM (Median)</h4>
+                <div class="cpm-value" id="cpmMedian">—</div>
+                <div class="cpm-breakdown" id="cpmMedianBreakdown"></div>
+              </div>
+              <div id="perPlatformCpm" class="per-platform-cpm"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Screenshots Section -->
+        <div class="section">
+          <h3 class="section-title">Page Screenshots</h3>
+          <div id="screenshotGallery" class="screenshot-gallery">
+            <p class="muted">No screenshots captured yet. Click "Capture Screenshot" above.</p>
+          </div>
+        </div>
+
+        </div><!-- end tabAnalytics -->
+
+        <!-- Summary Tab -->
+        <div class="tab-content" id="tabSummary" data-tab="summary" style="display:none;">
+
+          <!-- Cost Inputs Section -->
+          <div class="section summary-section">
+            <h3 class="section-title">Platform Costs</h3>
+            <p class="section-desc">Enter the cost for each platform deliverable.</p>
+            <div class="cost-grid">
+              <div class="cost-item">
+                <label>1x Dedicated IG Reel</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costIgReel" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item">
+                <label>1x Dedicated TikTok</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costTiktok" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item">
+                <label>1x Dedicated YouTube</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costYoutube" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item">
+                <label>1x Dedicated Podcast</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costPodcast" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item bundle">
+                <label>IG & TikTok Bundle</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costBundleIgTt" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item bundle">
+                <label>Full Bundle (All Platforms)</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costBundleAll" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Whitelisting Costs Section -->
+          <div class="section summary-section">
+            <h3 class="section-title">Whitelisting Costs <span class="badge-additional">Additional</span></h3>
+            <p class="section-desc">Additional cost for usage rights / whitelisting per platform.</p>
+            <div class="cost-grid">
+              <div class="cost-item wl">
+                <label>IG Whitelisting</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlIg" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item wl">
+                <label>TikTok Whitelisting</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlTiktok" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item wl">
+                <label>YouTube Whitelisting</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlYoutube" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item wl">
+                <label>Full Whitelisting Bundle</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlBundle" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Generate Summary Button -->
+          <div class="summary-actions">
+            <button id="generateSummaryBtn" class="btn btn-accent">Generate Summary</button>
+            <button id="copySummaryBtn" class="btn btn-secondary" style="display:none;">Copy to Clipboard</button>
+          </div>
+
+          <!-- Formatted Summary Output -->
+          <div id="summaryOutput" class="summary-output" style="display:none;">
+            <div class="summary-output-header">
+              <h3>Creator Summary</h3>
+            </div>
+            <div id="summaryContent" class="summary-content"></div>
+          </div>
+
+        </div><!-- end tabSummary -->
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Creator Modal -->
+  <div id="creatorModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add Creator</h2>
+        <button class="modal-close" id="modalCloseBtn">&times;</button>
+      </div>
+      <form id="creatorForm">
+        <div class="form-group">
+          <label>Creator Name *</label>
+          <div class="input-with-btn">
+            <input type="text" id="formName" required placeholder="e.g. MrBeast">
+            <button type="button" id="autoFillUrlsBtn" class="btn btn-accent btn-sm">Auto-fill URLs</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>YouTube URL</label>
+          <input type="text" id="formYoutube" placeholder="https://youtube.com/@username">
+        </div>
+        <div class="form-group">
+          <label>TikTok Username / URL</label>
+          <input type="text" id="formTiktok" placeholder="@username or https://tiktok.com/@username">
+        </div>
+        <div class="form-group">
+          <label>Instagram Username / URL</label>
+          <input type="text" id="formInstagram" placeholder="@username or https://instagram.com/username">
+        </div>
+        <div class="form-group">
+          <label>Podcast Link</label>
+          <input type="text" id="formPodcast" placeholder="https://podcasts.apple.com/...">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+    <div class="spinner"></div>
+    <p id="loadingText">Fetching data...</p>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
