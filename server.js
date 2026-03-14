@@ -296,13 +296,19 @@ app.post('/api/screenshot', async (req, res) => {
   let browser;
   try {
     browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-extensions'
+      ]
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-    await page.waitForTimeout(2000); // Wait for dynamic content
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for dynamic content
 
     const filename = `screenshot-${Date.now()}.png`;
     const filepath = path.join(screenshotsDir, filename);
