@@ -185,6 +185,32 @@
             </div>
           </div>
 
+          <!-- IG Reels Card -->
+          <div class="platform-card" data-platform="instagram_reels">
+            <div class="platform-header">
+              <span class="platform-icon ig-icon">&#127910;</span>
+              <h3>IG Reels</h3>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="igrFollowers" class="stat-input" placeholder="—" data-field="followers">
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="igrAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="igrMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="igrMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+
           <!-- Podcast Card -->
           <div class="platform-card" data-platform="podcast">
             <div class="platform-header">
@@ -251,6 +277,9 @@
                   </label>
                   <label class="toggle-label">
                     <input type="checkbox" id="cpmInstagram" value="instagram"> Instagram
+                  </label>
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmInstagramReels" value="instagram_reels"> IG Reels
                   </label>
                   <label class="toggle-label">
                     <input type="checkbox" id="cpmPodcast" value="podcast"> Podcast

@@ -298,12 +298,13 @@ app.get('/api/instagram/profile', async (req, res) => {
 
 // Instagram Looter API by IRROR Systems (RapidAPI)
 // Host: instagram-looter2.p.rapidapi.com
-// Profile endpoint: GET /profile?username={username}
-// Returns: profile data + last 12 posts with likes/comments/views
+// Profile endpoint: GET /profile?username={username} — returns profile + last 12 posts
+// Reels endpoint: GET /reels?id={user_id} — returns latest reels with view counts
 async function fetchInstagramViaLooter(username, rapidApiKey) {
   const host = 'instagram-looter2.p.rapidapi.com';
   const headers = { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host };
 
+  // Step 1: Fetch profile data (includes posts)
   console.log(`Instagram Looter: fetching profile for ${username}`);
   const res = await axios.get(`https://${host}/profile`, {
     params: { username },
@@ -317,15 +318,14 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
     return null;
   }
 
-  // Extract profile info — response uses Instagram graph format
   const followers = data.edge_followed_by?.count || data.follower_count || 0;
   const fullName = data.full_name || username;
   const profilePic = data.profile_pic_url_hd || data.profile_pic_url || '';
+  const userId = data.id || data.pk || null;
 
-  // Extract posts from profile response (comes with up to 12 posts)
+  // Extract posts from profile response (up to 12 posts with likes/comments)
   let posts = [];
   const rawPosts = data.edge_owner_to_timeline_media?.edges || [];
-
   if (rawPosts.length > 0) {
     posts = rawPosts
       .filter(p => !p.node?.pinned_for_users?.length)
@@ -344,6 +344,36 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
     console.log(`Instagram Looter: got ${posts.length} posts`);
   }
 
+  // Step 2: Fetch reels with view counts (separate API call)
+  let reels = [];
+  if (userId) {
+    try {
+      console.log(`Instagram Looter: fetching reels for user ID ${userId}`);
+      const reelsRes = await axios.get(`https://${host}/reels`, {
+        params: { id: userId },
+        headers,
+        timeout: 15000
+      });
+      const rawReels = reelsRes.data?.items || [];
+      reels = rawReels
+        .slice(0, 10)
+        .map(item => {
+          const m = item.media || item;
+          const caption = m.caption?.text || '';
+          return {
+            title: caption.substring(0, 80) || 'Untitled',
+            views: m.play_count || m.view_count || 0,
+            likes: m.like_count || 0,
+            comments: m.comment_count || 0,
+            publishedAt: m.taken_at ? new Date(m.taken_at * 1000).toISOString() : null
+          };
+        });
+      console.log(`Instagram Looter: got ${reels.length} reels`);
+    } catch (err) {
+      console.log(`Instagram Looter: reels fetch failed — ${err.response?.status || err.message}`);
+    }
+  }
+
   const totalEngagement = posts.reduce((sum, p) => sum + p.likes + p.comments, 0);
   const engagementRate = followers > 0 && posts.length > 0
     ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
@@ -355,7 +385,8 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
     profileImage: profilePic,
     followers: followers,
     engagementRate: parseFloat(engagementRate),
-    videos: posts
+    videos: posts,
+    reels: reels
   };
 }
 
