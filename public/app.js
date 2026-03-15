@@ -174,11 +174,12 @@ function renderDetail() {
     const videos = data.videos || [];
     const views = videos.map(v => v.views || 0);
 
-    document.getElementById(`${prefix}Followers`).value = data.followers ? formatNumber(data.followers) : '';
-    document.getElementById(`${prefix}Engagement`).value = data.engagementRate || '';
-    document.getElementById(`${prefix}AvgViews`).value = views.length ? formatNumber(calcAverage(views)) : '';
-    document.getElementById(`${prefix}MedianViews`).value = views.length ? formatNumber(calcMedian(views)) : '';
-    document.getElementById(`${prefix}MinViews`).value = views.length ? formatNumber(calcMin(views)) : '';
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    setVal(`${prefix}Followers`, data.followers ? formatNumber(data.followers) : '');
+    setVal(`${prefix}Engagement`, data.engagementRate || '');
+    setVal(`${prefix}AvgViews`, views.length ? formatNumber(calcAverage(views)) : '');
+    setVal(`${prefix}MedianViews`, views.length ? formatNumber(calcMedian(views)) : '');
+    setVal(`${prefix}MinViews`, views.length ? formatNumber(calcMin(views)) : '');
   });
 
   renderVideoTables(creator);
@@ -304,8 +305,8 @@ function handleVideoEdit(e) {
     creator.platforms[platform].videos.push({ title: '', views: 0 });
   }
 
-  if (field === 'views') {
-    creator.platforms[platform].videos[idx].views = parseNumberInput(e.target.value);
+  if (field === 'views' || field === 'likes') {
+    creator.platforms[platform].videos[idx][field] = parseNumberInput(e.target.value);
   } else {
     creator.platforms[platform].videos[idx][field] = e.target.value;
   }
