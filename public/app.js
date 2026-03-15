@@ -479,16 +479,20 @@ document.getElementById('captureScreenshotBtn').addEventListener('click', async 
   const creator = getSelectedCreator();
   if (!creator) return;
 
-  // Collect all URLs to screenshot
+  // Collect all URLs to screenshot — navigate to videos/posts pages to show view counts
   const urls = [];
-  if (creator.urls?.youtube) urls.push({ url: creator.urls.youtube, label: 'YouTube' });
+  if (creator.urls?.youtube) {
+    // Navigate to the Videos tab to show recent uploads with view counts
+    const ytUrl = creator.urls.youtube.replace(/\/$/, '');
+    urls.push({ url: `${ytUrl}/videos`, label: 'YouTube' });
+  }
   if (creator.urls?.tiktok) {
     const user = cleanUsername(creator.urls.tiktok);
     urls.push({ url: `https://www.tiktok.com/@${user}`, label: 'TikTok' });
   }
   if (creator.urls?.instagram) {
     const user = cleanUsername(creator.urls.instagram);
-    urls.push({ url: `https://www.instagram.com/${user}`, label: 'Instagram' });
+    urls.push({ url: `https://www.instagram.com/${user}/`, label: 'Instagram' });
   }
   if (creator.urls?.podcast) urls.push({ url: creator.urls.podcast, label: 'Podcast' });
 

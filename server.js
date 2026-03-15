@@ -312,9 +312,49 @@ app.post('/api/screenshot', async (req, res) => {
       ]
     });
     const page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 900 });
+    // Taller viewport to capture more videos/posts with view counts
+    await page.setViewport({ width: 1280, height: 1200 });
+    // Set a realistic user agent so platforms don't block us
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for dynamic content
+    // Wait for video thumbnails and view counts to render
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Dismiss platform-specific popups/overlays that block content
+    // Try clicking close/dismiss buttons first
+    try {
+      // Instagram: click the X button on the login popup
+      const closeBtn = await page.$('[aria-label="Close"], [role="dialog"] button svg, button[type="button"]');
+      if (closeBtn) await closeBtn.click();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (e) { /* ignore click errors */ }
+
+    await page.evaluate(() => {
+      // Remove all dialogs, modals, overlays
+      document.querySelectorAll('[role="presentation"], [role="dialog"]').forEach(el => el.remove());
+      // Remove any fixed/sticky overlays blocking content (login walls, cookie banners, CAPTCHAs)
+      document.querySelectorAll('body > div, body > section').forEach(el => {
+        const style = window.getComputedStyle(el);
+        if (style.position === 'fixed' || style.position === 'sticky') {
+          // Keep the main content container, remove overlays
+          if (parseInt(style.zIndex) > 1 || style.backgroundColor?.includes('rgba')) {
+            el.remove();
+          }
+        }
+      });
+      // Re-enable scrolling if body was locked by a modal
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.body.style.position = 'static';
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Scroll down slightly to trigger lazy-loaded content
+    await page.evaluate(() => window.scrollBy(0, 300));
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Scroll back to top for clean screenshot
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const filename = `screenshot-${Date.now()}.png`;
     const filepath = path.join(screenshotsDir, filename);
