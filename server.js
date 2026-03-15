@@ -355,7 +355,24 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
         timeout: 15000
       });
       const rawReels = reelsRes.data?.items || [];
+      // Log first reel structure to help debug pinned detection
+      // Log count of pinned reels filtered out
+      const pinnedCount = rawReels.filter(item => {
+        const m = item.media || item;
+        return m.timeline_pinned_user_ids?.length > 0 || m.clips_tab_pinned_user_ids?.length > 0 || m.is_artist_pick === true;
+      }).length;
+      if (pinnedCount > 0) console.log(`Instagram Looter: filtered out ${pinnedCount} pinned reel(s)`);
       reels = rawReels
+        // Filter out pinned reels (timeline or clips/reels tab)
+        .filter(item => {
+          const m = item.media || item;
+          const pinned = m.timeline_pinned_user_ids?.length > 0
+            || m.clips_tab_pinned_user_ids?.length > 0
+            || m.is_pinned === true
+            || m.is_artist_pick === true
+            || m.pinned_for_users?.length > 0;
+          return !pinned;
+        })
         .slice(0, 10)
         .map(item => {
           const m = item.media || item;
