@@ -1150,10 +1150,10 @@ function generateDealAnalysis(creator, platformData) {
   function getPriceBadge(actual, target) {
     if (!target || !actual) return { cls: '', label: '' };
     const diff = ((actual - target) / target) * 100;
-    if (diff < 0) return { cls: 'great', label: `${Math.abs(diff).toFixed(0)}% below target` };
-    if (diff <= 10) return { cls: 'good', label: `${diff.toFixed(0)}% above target` };
-    if (diff <= 30) return { cls: 'caution', label: `${diff.toFixed(0)}% above target` };
-    return { cls: 'expensive', label: `${diff.toFixed(0)}% above target` };
+    if (diff < 0) return { cls: 'great', label: `${Math.abs(diff).toFixed(0)}% under` };
+    if (diff <= 10) return { cls: 'good', label: `+${diff.toFixed(0)}%` };
+    if (diff <= 30) return { cls: 'caution', label: `+${diff.toFixed(0)}%` };
+    return { cls: 'expensive', label: `+${diff.toFixed(0)}%` };
   }
 
   let tableHtml = '';
@@ -1196,10 +1196,8 @@ function generateDealAnalysis(creator, platformData) {
       rows += `<tr>
         <td class="platform-label">${item.label}</td>
         <td>${formatNumber(views)}</td>
-        <td>$${targetCpm}</td>
         <td>$${Number(targetPrice.toFixed(0)).toLocaleString()}</td>
         <td>$${Number(actualNoWl).toLocaleString()}</td>
-        <td>$${actualCpm.toFixed(2)}</td>
         <td><span class="price-badge ${badgeNoWl.cls}">${badgeNoWl.label}</span></td>
       </tr>`;
 
@@ -1207,12 +1205,10 @@ function generateDealAnalysis(creator, platformData) {
       if (wlVal > 0) {
         const badgeWlResult = getPriceBadge(actualWithWl, targetPriceWl);
         rows += `<tr style="opacity:0.85;">
-          <td class="platform-label" style="padding-left:24px;">+ Whitelisting</td>
+          <td class="platform-label" style="padding-left:24px;">+ WL</td>
           <td>${formatNumber(views)}</td>
-          <td>$${targetCpmWl}</td>
           <td>$${Number(targetPriceWl.toFixed(0)).toLocaleString()}</td>
           <td>$${Number(actualWithWl).toLocaleString()}</td>
-          <td>$${actualCpmWl.toFixed(2)}</td>
           <td><span class="price-badge ${badgeWlResult.cls}">${badgeWlResult.label}</span></td>
         </tr>`;
       }
@@ -1226,10 +1222,8 @@ function generateDealAnalysis(creator, platformData) {
             <tr>
               <th>Platform</th>
               <th>Views</th>
-              <th>Target CPM</th>
               <th>Should Pay</th>
-              <th>Asking Price</th>
-              <th>Actual CPM</th>
+              <th>Asking</th>
               <th>Verdict</th>
             </tr>
           </thead>

@@ -1063,32 +1063,36 @@ body {
 }
 
 .deal-analysis-content {
-  padding: 24px;
+  padding: 12px;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .deal-table {
   width: 100%;
+  min-width: 500px;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .deal-table th {
   background: var(--bg-input);
-  padding: 10px 12px;
+  padding: 8px 8px;
   text-align: left;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   border-bottom: 2px solid var(--border);
+  white-space: nowrap;
 }
 
 .deal-table td {
-  padding: 10px 12px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .deal-table tr:last-child td {
