@@ -15,7 +15,12 @@
     "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1",
+    "express": "^5.2.1"
+  },
+  "optionalDependencies": {
     "puppeteer": "^24.38.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

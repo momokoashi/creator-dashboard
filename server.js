@@ -2,7 +2,9 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const puppeteer = require('puppeteer');
+// Puppeteer is optional — only available locally, not on cloud hosts
+let puppeteer;
+try { puppeteer = require('puppeteer'); } catch { puppeteer = null; }
 const path = require('path');
 const fs = require('fs');
 
@@ -291,6 +293,10 @@ app.post('/api/screenshot', async (req, res) => {
   const { url } = req.body;
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
+  }
+
+  if (!puppeteer) {
+    return res.status(501).json({ error: 'Screenshot capture is only available when running locally (Puppeteer not installed)' });
   }
 
   let browser;
