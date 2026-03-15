@@ -74,6 +74,7 @@ app.get('/api/youtube/channel', async (req, res) => {
         .sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
 
       // Split into long-form videos and Shorts based on duration
+      // YouTube Shorts can be up to 3 minutes (180s) since late 2024
       for (const v of allItems) {
         const duration = v.contentDetails?.duration || '';
         const seconds = parseDuration(duration);
@@ -86,7 +87,7 @@ app.get('/api/youtube/channel', async (req, res) => {
           videoId: v.id
         };
 
-        if (seconds <= 60) {
+        if (seconds <= 180) {
           if (shorts.length < 10) shorts.push(item);
         } else {
           if (videos.length < 10) videos.push(item);
