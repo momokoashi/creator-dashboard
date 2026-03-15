@@ -216,6 +216,7 @@ body {
 }
 
 .platform-card[data-platform="youtube"] .platform-header { border-left: 3px solid var(--yt-color); padding-left: 12px; }
+.platform-card[data-platform="youtube_shorts"] .platform-header { border-left: 3px solid #ff0000; padding-left: 12px; }
 .platform-card[data-platform="tiktok"] .platform-header { border-left: 3px solid var(--tt-color); padding-left: 12px; }
 .platform-card[data-platform="instagram"] .platform-header { border-left: 3px solid var(--ig-color); padding-left: 12px; }
 .platform-card[data-platform="podcast"] .platform-header { border-left: 3px solid var(--pod-color); padding-left: 12px; }

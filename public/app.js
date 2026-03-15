@@ -161,9 +161,12 @@ function renderDetail() {
   setLink('igLink', creator.urls?.instagram ? `https://www.instagram.com/${cleanUsername(creator.urls.instagram)}` : '');
   setLink('podLink', creator.urls?.podcast);
 
+  // YouTube Shorts link (same channel, /shorts tab)
+  setLink('ytsLink', creator.urls?.youtube ? creator.urls.youtube.replace(/\/$/, '') + '/shorts' : '');
+
   // Platform stats
-  const platforms = ['youtube', 'tiktok', 'instagram', 'podcast'];
-  const prefixes = { youtube: 'yt', tiktok: 'tt', instagram: 'ig', podcast: 'pod' };
+  const platforms = ['youtube', 'youtube_shorts', 'tiktok', 'instagram', 'podcast'];
+  const prefixes = { youtube: 'yt', youtube_shorts: 'yts', tiktok: 'tt', instagram: 'ig', podcast: 'pod' };
 
   platforms.forEach(p => {
     const prefix = prefixes[p];
@@ -208,6 +211,7 @@ function renderVideoTables(creator) {
 
   const platforms = [
     { key: 'youtube', label: 'YouTube' },
+    { key: 'youtube_shorts', label: 'YT Shorts' },
     { key: 'tiktok', label: 'TikTok' },
     { key: 'instagram', label: 'Instagram' },
     { key: 'podcast', label: 'Podcast' }
@@ -344,7 +348,7 @@ document.getElementById('calculateCpmBtn').addEventListener('click', () => {
   }
 
   const selectedPlatforms = [];
-  ['cpmYoutube', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
+  ['cpmYoutube', 'cpmYoutubeShorts', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
     const cb = document.getElementById(id);
     if (cb.checked) selectedPlatforms.push(cb.value);
   });
@@ -371,7 +375,7 @@ function renderCpmResults(creator) {
     // Restore saved CPM settings if they exist
     if (creator?.cpmCost) document.getElementById('cpmCost').value = creator.cpmCost;
     if (creator?.cpmPlatforms) {
-      ['cpmYoutube', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
+      ['cpmYoutube', 'cpmYoutubeShorts', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
         const cb = document.getElementById(id);
         cb.checked = creator.cpmPlatforms.includes(cb.value);
       });
@@ -381,7 +385,7 @@ function renderCpmResults(creator) {
 
   // Restore form state
   document.getElementById('cpmCost').value = cost;
-  ['cpmYoutube', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
+  ['cpmYoutube', 'cpmYoutubeShorts', 'cpmTiktok', 'cpmInstagram', 'cpmPodcast'].forEach(id => {
     const cb = document.getElementById(id);
     cb.checked = selectedPlatforms.includes(cb.value);
   });
@@ -423,12 +427,12 @@ function renderCpmResults(creator) {
   const perPlatformEl = document.getElementById('perPlatformCpm');
   perPlatformEl.innerHTML = '';
 
-  const platformLabels = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', podcast: 'Podcast' };
+  const platformLabels = { youtube: 'YouTube', youtube_shorts: 'YT Shorts', tiktok: 'TikTok', instagram: 'Instagram', podcast: 'Podcast' };
 
   perPlatform.forEach(pp => {
     perPlatformEl.innerHTML += `
       <div class="per-platform-cpm-card">
-        <h5>${platformLabels[pp.platform]}</h5>
+        <h5>${platformLabels[pp.platform] || pp.platform}</h5>
         <div>Avg: <span class="value">${pp.avgViews > 0 ? formatNumber(pp.avgViews) + ' views' : 'No data'}</span></div>
         <div>Median: <span class="value">${pp.medianViews > 0 ? formatNumber(pp.medianViews) + ' views' : 'No data'}</span></div>
         <div style="margin-top:6px;">CPM (Avg): <strong>${pp.avgCpm !== '—' ? '$' + pp.avgCpm : '—'}</strong></div>
@@ -519,6 +523,11 @@ document.getElementById('captureScreenshotBtn').addEventListener('click', async 
           label: label,
           timestamp: Date.now()
         });
+      } else if (res.status === 501) {
+        // Puppeteer not available (cloud deployment)
+        showToast('Screenshots are only available when running locally (not on cloud hosting)', 'error');
+        hideLoading();
+        return; // Stop trying other platforms too
       } else {
         showToast(`Screenshot failed for ${label}: ${data.error}`, 'error');
       }
@@ -590,6 +599,14 @@ async function fetchYouTubeData(creator) {
       creator.platforms.youtube.channelName = data.channelName;
       creator.platforms.youtube.profileImage = data.profileImage;
       creator.platforms.youtube.autoFetched = true;
+
+      // Store YouTube Shorts separately (same channel, same followers)
+      if (data.shorts && data.shorts.length > 0) {
+        if (!creator.platforms.youtube_shorts) creator.platforms.youtube_shorts = {};
+        creator.platforms.youtube_shorts.followers = data.followers;
+        creator.platforms.youtube_shorts.videos = data.shorts;
+        creator.platforms.youtube_shorts.autoFetched = true;
+      }
     } else {
       showToast(`YouTube: ${data.error}`, 'error');
     }
@@ -863,10 +880,10 @@ function generateSummary(creator) {
 
   // Gather view data for active platforms
   const platformData = {};
-  const platformLabels = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YouTube', podcast: 'Podcast' };
-  const platformNames = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', podcast: 'Podcast' };
+  const platformLabels = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YouTube', youtube_shorts: 'YT Shorts', podcast: 'Podcast' };
+  const platformNames = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', youtube_shorts: 'YT Shorts', podcast: 'Podcast' };
 
-  ['instagram', 'tiktok', 'youtube', 'podcast'].forEach(p => {
+  ['instagram', 'tiktok', 'youtube', 'youtube_shorts', 'podcast'].forEach(p => {
     const data = platforms[p] || {};
     const videos = (data.videos || []).map(v => v.views || 0).filter(v => v > 0);
     if (videos.length > 0 || data.followers) {
@@ -952,6 +969,7 @@ function generateSummary(creator) {
     { label: 'IG reel', costKey: 'costIgReel', platform: 'instagram' },
     { label: 'TikTok reel', costKey: 'costTiktok', platform: 'tiktok' },
     { label: 'YouTube video', costKey: 'costYoutube', platform: 'youtube' },
+    { label: 'YT Short', costKey: 'costYtShorts', platform: 'youtube_shorts' },
     { label: 'Podcast episode', costKey: 'costPodcast', platform: 'podcast' }
   ];
 
@@ -1039,7 +1057,7 @@ function getSummaryPlainText() {
 
   const costs = creator.costs || {};
   const platforms = creator.platforms || {};
-  const platformLabels = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YouTube', podcast: 'Podcast' };
+  const platformLabels = { instagram: 'IG', tiktok: 'TikTok', youtube: 'YouTube', youtube_shorts: 'YT Shorts', podcast: 'Podcast' };
 
   const igUrl = creator.urls?.instagram
     ? `https://www.instagram.com/${cleanUsername(creator.urls.instagram)}/`
@@ -1047,7 +1065,7 @@ function getSummaryPlainText() {
 
   // Gather view data
   const platformData = {};
-  ['instagram', 'tiktok', 'youtube', 'podcast'].forEach(p => {
+  ['instagram', 'tiktok', 'youtube', 'youtube_shorts', 'podcast'].forEach(p => {
     const data = platforms[p] || {};
     const videos = (data.videos || []).map(v => v.views || 0).filter(v => v > 0);
     if (videos.length > 0 || data.followers) {
@@ -1096,14 +1114,15 @@ function getSummaryPlainText() {
 
   // CPM
   text += '\n• CPM\n';
-  const cpmEntries = [
+  const cpmEntries2 = [
     { label: 'IG reel', costKey: 'costIgReel', platform: 'instagram' },
     { label: 'TikTok reel', costKey: 'costTiktok', platform: 'tiktok' },
     { label: 'YouTube video', costKey: 'costYoutube', platform: 'youtube' },
+    { label: 'YT Short', costKey: 'costYtShorts', platform: 'youtube_shorts' },
     { label: 'Podcast episode', costKey: 'costPodcast', platform: 'podcast' }
   ];
 
-  cpmEntries.forEach(({ label, costKey, platform }) => {
+  cpmEntries2.forEach(({ label, costKey, platform }) => {
     const cost = costs[costKey] || 0;
     const d = platformData[platform];
     if (cost > 0 && d) {

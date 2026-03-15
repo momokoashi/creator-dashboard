@@ -89,6 +89,38 @@
             </div>
           </div>
 
+          <!-- YouTube Shorts Card -->
+          <div class="platform-card" data-platform="youtube_shorts">
+            <div class="platform-header">
+              <span class="platform-icon yts-icon">&#9654;</span>
+              <h3>YT Shorts</h3>
+              <a id="ytsLink" class="platform-link" target="_blank" title="Open Shorts">&#8599;</a>
+            </div>
+            <div class="platform-stats">
+              <div class="stat">
+                <label>Followers</label>
+                <input type="text" id="ytsFollowers" class="stat-input" placeholder="—" data-field="followers" readonly>
+              </div>
+              <div class="stat">
+                <label>Engagement Rate</label>
+                <input type="text" id="ytsEngagement" class="stat-input" placeholder="—" data-field="engagementRate">
+                <span class="stat-suffix">%</span>
+              </div>
+              <div class="stat">
+                <label>Avg Views (10)</label>
+                <input type="text" id="ytsAvgViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Median Views (10)</label>
+                <input type="text" id="ytsMedianViews" class="stat-input" placeholder="—" readonly>
+              </div>
+              <div class="stat">
+                <label>Min Views (10)</label>
+                <input type="text" id="ytsMinViews" class="stat-input" placeholder="—" readonly>
+              </div>
+            </div>
+          </div>
+
           <!-- TikTok Card -->
           <div class="platform-card" data-platform="tiktok">
             <div class="platform-header">
@@ -210,6 +242,9 @@
                 <div class="platform-toggles">
                   <label class="toggle-label">
                     <input type="checkbox" id="cpmYoutube" value="youtube"> YouTube
+                  </label>
+                  <label class="toggle-label">
+                    <input type="checkbox" id="cpmYoutubeShorts" value="youtube_shorts"> YT Shorts
                   </label>
                   <label class="toggle-label">
                     <input type="checkbox" id="cpmTiktok" value="tiktok"> TikTok

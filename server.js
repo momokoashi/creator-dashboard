@@ -55,32 +55,46 @@ app.get('/api/youtube/channel', async (req, res) => {
     const channel = channelRes.data.items[0];
     const stats = channel.statistics;
 
-    // Get last 20 videos, take top 10 by date
+    // Get last 50 videos, filter out Shorts (<=60s), take top 10 by date
     const videosRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-      params: { part: 'id', channelId, maxResults: 20, order: 'date', type: 'video', key: apiKey }
+      params: { part: 'id', channelId, maxResults: 50, order: 'date', type: 'video', key: apiKey }
     });
 
     const videoIds = videosRes.data.items.map(v => v.id.videoId).filter(Boolean);
     let videos = [];
+    let shorts = [];
 
     if (videoIds.length > 0) {
+      // Fetch statistics, snippet, AND contentDetails to get video duration
       const detailsRes = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
-        params: { part: 'statistics,snippet', id: videoIds.join(','), key: apiKey }
+        params: { part: 'statistics,snippet,contentDetails', id: videoIds.join(','), key: apiKey }
       });
 
-      videos = detailsRes.data.items
-        .sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt))
-        .slice(0, 10)
-        .map(v => ({
+      const allItems = detailsRes.data.items
+        .sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+
+      // Split into long-form videos and Shorts based on duration
+      for (const v of allItems) {
+        const duration = v.contentDetails?.duration || '';
+        const seconds = parseDuration(duration);
+        const item = {
           title: v.snippet.title,
           views: parseInt(v.statistics.viewCount) || 0,
           likes: parseInt(v.statistics.likeCount) || 0,
           comments: parseInt(v.statistics.commentCount) || 0,
           publishedAt: v.snippet.publishedAt,
           videoId: v.id
-        }));
+        };
+
+        if (seconds <= 60) {
+          if (shorts.length < 10) shorts.push(item);
+        } else {
+          if (videos.length < 10) videos.push(item);
+        }
+      }
     }
 
+    // Engagement rate based on long-form videos
     const totalLikes = videos.reduce((sum, v) => sum + v.likes, 0);
     const totalComments = videos.reduce((sum, v) => sum + v.comments, 0);
     const totalVideoViews = videos.reduce((sum, v) => sum + v.views, 0);
@@ -94,13 +108,24 @@ app.get('/api/youtube/channel', async (req, res) => {
       followers: parseInt(stats.subscriberCount) || 0,
       totalViews: parseInt(stats.viewCount) || 0,
       engagementRate: parseFloat(engagementRate),
-      videos
+      videos,
+      shorts
     });
   } catch (err) {
     console.error('YouTube API error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch YouTube data: ' + (err.response?.data?.error?.message || err.message) });
   }
 });
+
+// Parse YouTube ISO 8601 duration (e.g., "PT30M4S") to total seconds
+function parseDuration(iso) {
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  const hours = parseInt(match[1]) || 0;
+  const minutes = parseInt(match[2]) || 0;
+  const seconds = parseInt(match[3]) || 0;
+  return hours * 3600 + minutes * 60 + seconds;
+}
 
 async function resolveYouTubeChannel(url, apiKey) {
   const patterns = [
@@ -214,76 +239,150 @@ app.get('/api/tiktok/profile', async (req, res) => {
 });
 
 // ============================================================
-// Instagram API (Direct — FREE, no RapidAPI needed)
-// Uses Instagram's public web API for public profile data
+// Instagram API (RapidAPI scraper with direct API fallback)
+// Primary: instagram-scraper-api2 on RapidAPI
+// Fallback: Instagram's public web API (rate-limited)
 // ============================================================
 
 app.get('/api/instagram/profile', async (req, res) => {
   const { username } = req.query;
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
 
   if (!username) {
     return res.status(400).json({ error: 'Username parameter required' });
   }
 
-  try {
-    const cleanUsername = username.replace('@', '').replace('https://www.instagram.com/', '').split('/')[0].split('?')[0];
+  const cleanUser = username.replace('@', '').replace('https://www.instagram.com/', '').split('/')[0].split('?')[0];
 
-    // Fetch profile + recent posts from Instagram's public web API
-    const profileRes = await axios.get('https://www.instagram.com/api/v1/users/web_profile_info/', {
-      params: { username: cleanUsername },
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'X-IG-App-ID': '936619743392459'
-      }
-    });
-
-    const userData = profileRes.data?.data?.user;
-    if (!userData) {
-      return res.status(404).json({ error: 'Instagram user not found' });
+  // Strategy 1: RapidAPI Instagram Scraper API2 (most reliable)
+  if (rapidApiKey) {
+    try {
+      const result = await fetchInstagramViaRapidAPI(cleanUser, rapidApiKey);
+      if (result) return res.json(result);
+    } catch (err) {
+      console.error('Instagram RapidAPI error:', err.response?.data?.message || err.message);
+      // Fall through to direct API
     }
+  }
 
-    // Extract recent posts from the profile response (returns up to 12)
-    const rawPosts = userData.edge_owner_to_timeline_media?.edges || [];
-
-    // Filter out pinned posts and take last 10
-    const posts = rawPosts
-      .filter(p => !p.node?.pinned_for_users?.length)
-      .slice(0, 10)
-      .map(p => {
-        const node = p.node;
-        const caption = node.edge_media_to_caption?.edges?.[0]?.node?.text || '';
-        return {
-          title: caption.substring(0, 80),
-          views: node.video_view_count || node.edge_liked_by?.count || 0,
-          likes: node.edge_liked_by?.count || 0,
-          comments: node.edge_media_to_comment?.count || 0,
-          publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null
-        };
-      });
-
-    const followers = userData.edge_followed_by?.count || 0;
-    const totalEngagement = posts.reduce((sum, p) => sum + p.likes + p.comments, 0);
-    const engagementRate = followers > 0 && posts.length > 0
-      ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
-      : 0;
-
-    res.json({
-      platform: 'instagram',
-      channelName: userData.full_name || cleanUsername,
-      profileImage: userData.profile_pic_url || '',
-      followers: followers,
-      engagementRate: parseFloat(engagementRate),
-      videos: posts
-    });
+  // Strategy 2: Instagram's direct public web API (free but rate-limited)
+  try {
+    const result = await fetchInstagramDirect(cleanUser);
+    if (result) return res.json(result);
+    return res.status(404).json({ error: 'Instagram user not found' });
   } catch (err) {
-    console.error('Instagram API error:', err.response?.data || err.message);
-    const status = err.response?.status === 404 ? 404 : 500;
-    const msg = err.response?.status === 404
-      ? 'Instagram user not found'
-      : 'Failed to fetch Instagram data: ' + (err.response?.data?.message || err.message);
+    console.error('Instagram direct API error:', err.response?.data || err.message);
+    const status = err.response?.status === 429 ? 429 : (err.response?.status === 404 ? 404 : 500);
+    const msg = status === 429
+      ? 'Instagram rate limited. Try again in a few minutes, or subscribe to instagram-scraper-api2 on RapidAPI for reliable access.'
+      : status === 404
+        ? 'Instagram user not found'
+        : 'Failed to fetch Instagram data: ' + (err.response?.data?.message || err.message);
     res.status(status).json({ error: msg });
   }
 });
+
+// RapidAPI: instagram-scraper-api2 (requires subscription)
+async function fetchInstagramViaRapidAPI(username, rapidApiKey) {
+  // Get profile info
+  const profileRes = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/info', {
+    params: { username_or_id_or_url: username },
+    headers: {
+      'x-rapidapi-key': rapidApiKey,
+      'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+    }
+  });
+
+  const userData = profileRes.data?.data;
+  if (!userData) return null;
+
+  // Get recent posts
+  let posts = [];
+  try {
+    const postsRes = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/posts', {
+      params: { username_or_id_or_url: username },
+      headers: {
+        'x-rapidapi-key': rapidApiKey,
+        'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+      }
+    });
+
+    const rawPosts = postsRes.data?.data?.items || postsRes.data?.data || [];
+    posts = Array.isArray(rawPosts) ? rawPosts
+      .filter(p => !p.is_pinned)
+      .slice(0, 10)
+      .map(p => ({
+        title: (p.caption?.text || p.title || 'Untitled').substring(0, 80),
+        views: p.play_count || p.video_view_count || p.like_count || 0,
+        likes: p.like_count || 0,
+        comments: p.comment_count || 0,
+        publishedAt: p.taken_at ? new Date(p.taken_at * 1000).toISOString() : null
+      })) : [];
+  } catch (err) {
+    console.error('Instagram posts fetch error:', err.message);
+    // Continue with profile data even if posts fail
+  }
+
+  const followers = userData.follower_count || 0;
+  const totalEngagement = posts.reduce((sum, p) => sum + p.likes + p.comments, 0);
+  const engagementRate = followers > 0 && posts.length > 0
+    ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
+    : 0;
+
+  return {
+    platform: 'instagram',
+    channelName: userData.full_name || username,
+    profileImage: userData.profile_pic_url || userData.profile_pic_url_hd || '',
+    followers: followers,
+    engagementRate: parseFloat(engagementRate),
+    videos: posts
+  };
+}
+
+// Direct Instagram public web API (free, no key needed, but rate-limited)
+async function fetchInstagramDirect(username) {
+  const profileRes = await axios.get('https://www.instagram.com/api/v1/users/web_profile_info/', {
+    params: { username },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'X-IG-App-ID': '936619743392459'
+    }
+  });
+
+  const userData = profileRes.data?.data?.user;
+  if (!userData) return null;
+
+  const rawPosts = userData.edge_owner_to_timeline_media?.edges || [];
+  const posts = rawPosts
+    .filter(p => !p.node?.pinned_for_users?.length)
+    .slice(0, 10)
+    .map(p => {
+      const node = p.node;
+      const caption = node.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+      return {
+        title: caption.substring(0, 80),
+        views: node.video_view_count || node.edge_liked_by?.count || 0,
+        likes: node.edge_liked_by?.count || 0,
+        comments: node.edge_media_to_comment?.count || 0,
+        publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null
+      };
+    });
+
+  const followers = userData.edge_followed_by?.count || 0;
+  const totalEngagement = posts.reduce((sum, p) => sum + p.likes + p.comments, 0);
+  const engagementRate = followers > 0 && posts.length > 0
+    ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
+    : 0;
+
+  return {
+    platform: 'instagram',
+    channelName: userData.full_name || username,
+    profileImage: userData.profile_pic_url || '',
+    followers: followers,
+    engagementRate: parseFloat(engagementRate),
+    videos: posts
+  };
+}
 
 // ============================================================
 // Screenshot Capture
