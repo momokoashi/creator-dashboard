@@ -826,15 +826,35 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // Cost field IDs mapped to creator data keys
 const costFieldMap = {
   costIgReel: 'costIgReel',
+  costIgReels: 'costIgReels',
   costTiktok: 'costTiktok',
   costYoutube: 'costYoutube',
+  costYtShorts: 'costYtShorts',
   costPodcast: 'costPodcast',
   costBundleIgTt: 'costBundleIgTt',
   costBundleAll: 'costBundleAll',
   wlIg: 'wlIg',
+  wlIgReels: 'wlIgReels',
   wlTiktok: 'wlTiktok',
   wlYoutube: 'wlYoutube',
+  wlYtShorts: 'wlYtShorts',
   wlBundle: 'wlBundle'
+};
+
+// Target CPM field IDs mapped to creator data keys
+const targetCpmFieldMap = {
+  targetCpmYoutube: 'targetCpmYoutube',
+  targetCpmYoutubeWl: 'targetCpmYoutubeWl',
+  targetCpmYtShorts: 'targetCpmYtShorts',
+  targetCpmYtShortsWl: 'targetCpmYtShortsWl',
+  targetCpmPodcast: 'targetCpmPodcast',
+  targetCpmPodcastWl: 'targetCpmPodcastWl',
+  targetCpmInstagram: 'targetCpmInstagram',
+  targetCpmInstagramWl: 'targetCpmInstagramWl',
+  targetCpmIgReels: 'targetCpmIgReels',
+  targetCpmIgReelsWl: 'targetCpmIgReelsWl',
+  targetCpmTiktok: 'targetCpmTiktok',
+  targetCpmTiktokWl: 'targetCpmTiktokWl'
 };
 
 // Auto-save cost inputs on change
@@ -851,16 +871,38 @@ Object.keys(costFieldMap).forEach(fieldId => {
   }
 });
 
-// Load saved cost values into the summary form
+// Auto-save target CPM inputs on change
+Object.keys(targetCpmFieldMap).forEach(fieldId => {
+  const el = document.getElementById(fieldId);
+  if (el) {
+    el.addEventListener('change', () => {
+      const creator = getSelectedCreator();
+      if (!creator) return;
+      if (!creator.targetCpms) creator.targetCpms = {};
+      creator.targetCpms[targetCpmFieldMap[fieldId]] = parseFloat(el.value) || 0;
+      saveData();
+    });
+  }
+});
+
+// Load saved cost values and target CPMs into the summary form
 function loadSummaryCosts() {
   const creator = getSelectedCreator();
   if (!creator) return;
   const costs = creator.costs || {};
+  const targets = creator.targetCpms || {};
 
   Object.keys(costFieldMap).forEach(fieldId => {
     const el = document.getElementById(fieldId);
     if (el) {
       el.value = costs[costFieldMap[fieldId]] || '';
+    }
+  });
+
+  Object.keys(targetCpmFieldMap).forEach(fieldId => {
+    const el = document.getElementById(fieldId);
+    if (el) {
+      el.value = targets[targetCpmFieldMap[fieldId]] || '';
     }
   });
 }
@@ -1068,6 +1110,140 @@ function generateSummary(creator) {
   document.getElementById('summaryContent').innerHTML = html;
   document.getElementById('summaryOutput').style.display = 'block';
   document.getElementById('copySummaryBtn').style.display = 'inline-flex';
+
+  // === DEAL ANALYSIS — Target vs Actual ===
+  generateDealAnalysis(creator, platformData);
+}
+
+// Generate the deal analysis comparing target CPM price vs actual asking price
+function generateDealAnalysis(creator, platformData) {
+  const costs = creator.costs || {};
+  const targets = creator.targetCpms || {};
+
+  // Default target CPMs (from the user's benchmark screenshot) — used when no custom value is set
+  const defaults = {
+    targetCpmYoutube: 20, targetCpmYoutubeWl: 30,
+    targetCpmYtShorts: 20, targetCpmYtShortsWl: 30,
+    targetCpmPodcast: 20, targetCpmPodcastWl: 30,
+    targetCpmInstagram: 10, targetCpmInstagramWl: 30,
+    targetCpmIgReels: 10, targetCpmIgReelsWl: 30,
+    targetCpmTiktok: 15, targetCpmTiktokWl: 25
+  };
+
+  // Helper: get target CPM value (user-set or default)
+  function getTarget(key) {
+    return targets[key] || defaults[key] || 0;
+  }
+
+  // Platform analysis config: maps platform key to cost/whitelisting/target CPM keys
+  const analysisItems = [
+    { platform: 'youtube', label: 'YouTube', costKey: 'costYoutube', wlKey: 'wlYoutube', targetKey: 'targetCpmYoutube', targetWlKey: 'targetCpmYoutubeWl' },
+    { platform: 'youtube_shorts', label: 'YT Shorts', costKey: 'costYtShorts', wlKey: 'wlYtShorts', targetKey: 'targetCpmYtShorts', targetWlKey: 'targetCpmYtShortsWl' },
+    { platform: 'tiktok', label: 'TikTok', costKey: 'costTiktok', wlKey: 'wlTiktok', targetKey: 'targetCpmTiktok', targetWlKey: 'targetCpmTiktokWl' },
+    { platform: 'instagram', label: 'Instagram', costKey: 'costIgReel', wlKey: 'wlIg', targetKey: 'targetCpmInstagram', targetWlKey: 'targetCpmInstagramWl' },
+    { platform: 'instagram_reels', label: 'IG Reels', costKey: 'costIgReels', wlKey: 'wlIgReels', targetKey: 'targetCpmIgReels', targetWlKey: 'targetCpmIgReelsWl' },
+    { platform: 'podcast', label: 'Podcast', costKey: 'costPodcast', wlKey: 'wlBundle', targetKey: 'targetCpmPodcast', targetWlKey: 'targetCpmPodcastWl' }
+  ];
+
+  // Get color-coded badge based on how far actual is from target
+  // Red: >30% over, Yellow: 10-30% over, Green: 0-10% over, Blue: below target
+  function getPriceBadge(actual, target) {
+    if (!target || !actual) return { cls: '', label: '' };
+    const diff = ((actual - target) / target) * 100;
+    if (diff < 0) return { cls: 'great', label: `${Math.abs(diff).toFixed(0)}% below target` };
+    if (diff <= 10) return { cls: 'good', label: `${diff.toFixed(0)}% above target` };
+    if (diff <= 30) return { cls: 'caution', label: `${diff.toFixed(0)}% above target` };
+    return { cls: 'expensive', label: `${diff.toFixed(0)}% above target` };
+  }
+
+  let tableHtml = '';
+  let hasData = false;
+
+  // Build a table for each view metric (average, median, min)
+  ['Average', 'Median', 'Min'].forEach(metric => {
+    const metricKey = metric.toLowerCase() === 'average' ? 'avg' : metric.toLowerCase();
+    let rows = '';
+
+    analysisItems.forEach(item => {
+      const d = platformData[item.platform];
+      const costVal = costs[item.costKey] || 0;
+      const wlVal = costs[item.wlKey] || 0;
+      if (!d || !d[metricKey] || d[metricKey] <= 0) return;
+      if (costVal <= 0) return;
+
+      const views = d[metricKey];
+      const targetCpm = getTarget(item.targetKey);
+      const targetCpmWl = getTarget(item.targetWlKey);
+
+      // Target price: what you SHOULD pay based on target CPM
+      const targetPrice = (targetCpm * views) / 1000;
+      const targetPriceWl = (targetCpmWl * views) / 1000;
+
+      // Actual price: what the creator is asking
+      const actualNoWl = costVal;
+      const actualWithWl = costVal + wlVal;
+
+      // Actual CPM
+      const actualCpm = (costVal / views) * 1000;
+      const actualCpmWl = ((costVal + wlVal) / views) * 1000;
+
+      // Get badges
+      const badgeNoWl = getPriceBadge(actualNoWl, targetPrice);
+      const badgeWl = wlVal > 0 ? getPriceBadge(actualWithWl, targetPriceWl) : null;
+
+      hasData = true;
+
+      rows += `<tr>
+        <td class="platform-label">${item.label}</td>
+        <td>${formatNumber(views)}</td>
+        <td>$${targetCpm}</td>
+        <td>$${Number(targetPrice.toFixed(0)).toLocaleString()}</td>
+        <td>$${Number(actualNoWl).toLocaleString()}</td>
+        <td>$${actualCpm.toFixed(2)}</td>
+        <td><span class="price-badge ${badgeNoWl.cls}">${badgeNoWl.label}</span></td>
+      </tr>`;
+
+      // With whitelisting row (if whitelisting cost is set)
+      if (wlVal > 0) {
+        const badgeWlResult = getPriceBadge(actualWithWl, targetPriceWl);
+        rows += `<tr style="opacity:0.85;">
+          <td class="platform-label" style="padding-left:24px;">+ Whitelisting</td>
+          <td>${formatNumber(views)}</td>
+          <td>$${targetCpmWl}</td>
+          <td>$${Number(targetPriceWl.toFixed(0)).toLocaleString()}</td>
+          <td>$${Number(actualWithWl).toLocaleString()}</td>
+          <td>$${actualCpmWl.toFixed(2)}</td>
+          <td><span class="price-badge ${badgeWlResult.cls}">${badgeWlResult.label}</span></td>
+        </tr>`;
+      }
+    });
+
+    if (rows) {
+      tableHtml += `
+        <h4 style="margin: ${tableHtml ? '20px' : '0'} 0 10px 0; color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${metric} Views</h4>
+        <table class="deal-table">
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>Views</th>
+              <th>Target CPM</th>
+              <th>Should Pay</th>
+              <th>Asking Price</th>
+              <th>Actual CPM</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+  });
+
+  if (!hasData) {
+    tableHtml = '<p style="color: var(--text-muted); padding: 12px;">Enter platform costs and fetch view data to see the deal analysis.</p>';
+  }
+
+  document.getElementById('dealAnalysisContent').innerHTML = tableHtml;
+  document.getElementById('dealAnalysisOutput').style.display = 'block';
 }
 
 // Build plain text version for clipboard copy

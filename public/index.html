@@ -355,6 +355,20 @@
                   <input type="number" id="costPodcast" placeholder="0" min="0" step="100">
                 </div>
               </div>
+              <div class="cost-item">
+                <label>1x Dedicated IG Reel</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costIgReels" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item">
+                <label>1x Dedicated YT Short</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="costYtShorts" placeholder="0" min="0" step="100">
+                </div>
+              </div>
               <div class="cost-item bundle">
                 <label>IG & TikTok Bundle</label>
                 <div class="cost-input-wrap">
@@ -399,6 +413,20 @@
                 </div>
               </div>
               <div class="cost-item wl">
+                <label>YT Shorts Whitelisting</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlYtShorts" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item wl">
+                <label>IG Reels Whitelisting</label>
+                <div class="cost-input-wrap">
+                  <span class="cost-prefix">$</span>
+                  <input type="number" id="wlIgReels" placeholder="0" min="0" step="100">
+                </div>
+              </div>
+              <div class="cost-item wl">
                 <label>Full Whitelisting Bundle</label>
                 <div class="cost-input-wrap">
                   <span class="cost-prefix">$</span>
@@ -408,10 +436,61 @@
             </div>
           </div>
 
+          <!-- Target CPM Rates Section -->
+          <div class="section summary-section">
+            <h3 class="section-title">Target CPM Rates <span class="badge-additional">Benchmarks</span></h3>
+            <p class="section-desc">Set your target CPM rates per platform. Used to calculate what you should be paying vs. what the creator is asking.</p>
+            <div class="target-cpm-grid">
+              <div class="target-cpm-header">
+                <span></span>
+                <span class="target-header-label">No Usage Rights</span>
+                <span class="target-header-label">With Usage Rights</span>
+              </div>
+              <div class="target-cpm-row">
+                <label>YouTube</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmYoutube" placeholder="20" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmYoutubeWl" placeholder="30" min="0" step="1"></div>
+              </div>
+              <div class="target-cpm-row">
+                <label>YT Shorts</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmYtShorts" placeholder="20" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmYtShortsWl" placeholder="30" min="0" step="1"></div>
+              </div>
+              <div class="target-cpm-row">
+                <label>Podcast</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmPodcast" placeholder="20" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmPodcastWl" placeholder="30" min="0" step="1"></div>
+              </div>
+              <div class="target-cpm-row">
+                <label>Instagram</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmInstagram" placeholder="10" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmInstagramWl" placeholder="30" min="0" step="1"></div>
+              </div>
+              <div class="target-cpm-row">
+                <label>IG Reels</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmIgReels" placeholder="10" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmIgReelsWl" placeholder="30" min="0" step="1"></div>
+              </div>
+              <div class="target-cpm-row">
+                <label>TikTok</label>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmTiktok" placeholder="15" min="0" step="1"></div>
+                <div class="cost-input-wrap compact"><span class="cost-prefix">$</span><input type="number" id="targetCpmTiktokWl" placeholder="25" min="0" step="1"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- Generate Summary Button -->
           <div class="summary-actions">
             <button id="generateSummaryBtn" class="btn btn-accent">Generate Summary</button>
             <button id="copySummaryBtn" class="btn btn-secondary" style="display:none;">Copy to Clipboard</button>
+          </div>
+
+          <!-- Deal Analysis Output -->
+          <div id="dealAnalysisOutput" class="deal-analysis-output" style="display:none;">
+            <div class="summary-output-header">
+              <h3>Deal Analysis — Target vs. Actual</h3>
+            </div>
+            <div id="dealAnalysisContent" class="deal-analysis-content"></div>
           </div>
 
           <!-- Formatted Summary Output -->
