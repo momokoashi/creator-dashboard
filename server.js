@@ -55,21 +55,32 @@ app.get('/api/youtube/channel', async (req, res) => {
     const channel = channelRes.data.items[0];
     const stats = channel.statistics;
 
-    // Get last 50 videos, filter out Shorts (<=60s), take top 10 by date
-    const videosRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-      params: { part: 'id', channelId, maxResults: 50, order: 'date', type: 'video', key: apiKey }
-    });
-
-    const videoIds = videosRes.data.items.map(v => v.id.videoId).filter(Boolean);
+    // Use the channel's uploads playlist for reliable chronological order
+    // The Search API skips videos; PlaylistItems returns ALL uploads in order
+    const uploadsPlaylistId = 'UU' + channelId.substring(2); // UC... -> UU...
     let videos = [];
     let shorts = [];
+    let nextPageToken = null;
+    const maxPages = 4; // Up to 200 results to ensure 10 of each type
 
-    if (videoIds.length > 0) {
+    for (let page = 0; page < maxPages; page++) {
+      if (videos.length >= 10 && shorts.length >= 10) break;
+
+      const playlistParams = { part: 'contentDetails', playlistId: uploadsPlaylistId, maxResults: 50, key: apiKey };
+      if (nextPageToken) playlistParams.pageToken = nextPageToken;
+
+      const playlistRes = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', { params: playlistParams });
+      const videoIds = playlistRes.data.items.map(v => v.contentDetails.videoId).filter(Boolean);
+      nextPageToken = playlistRes.data.nextPageToken || null;
+
+      if (videoIds.length === 0) break;
+
       // Fetch statistics, snippet, AND contentDetails to get video duration
       const detailsRes = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
         params: { part: 'statistics,snippet,contentDetails', id: videoIds.join(','), key: apiKey }
       });
 
+      // Keep original playlist order (newest first) by sorting by publish date
       const allItems = detailsRes.data.items
         .sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
 
@@ -93,6 +104,8 @@ app.get('/api/youtube/channel', async (req, res) => {
           if (videos.length < 10) videos.push(item);
         }
       }
+
+      if (!nextPageToken) break;
     }
 
     // Engagement rate based on long-form videos
