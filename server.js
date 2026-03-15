@@ -283,48 +283,119 @@ app.get('/api/instagram/profile', async (req, res) => {
   }
 });
 
-// RapidAPI: instagram-scraper-api2 (requires subscription)
+// RapidAPI: instagram-scraper by junioroangel (requires subscription)
+// Host: instagram-scraper.p.rapidapi.com
+// Endpoints from official PHP SDK: /api/v1/account_username, /api/v1/medias, etc.
 async function fetchInstagramViaRapidAPI(username, rapidApiKey) {
-  // Get profile info
-  const profileRes = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/info', {
-    params: { username_or_id_or_url: username },
-    headers: {
-      'x-rapidapi-key': rapidApiKey,
-      'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
-    }
-  });
+  const host = 'instagram-scraper.p.rapidapi.com';
+  const headers = { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': host };
 
-  const userData = profileRes.data?.data;
-  if (!userData) return null;
+  // Step 1: Get profile info using the official SDK endpoint
+  let profileData = null;
+  const profileEndpoints = [
+    { url: `https://${host}/api/v1/account_username`, params: { username } },
+    { url: `https://${host}/ig/info/`, params: { user: username } },
+    { url: `https://${host}/ig/web_profile_info/`, params: { user: username } },
+  ];
 
-  // Get recent posts
-  let posts = [];
-  try {
-    const postsRes = await axios.get('https://instagram-scraper-api2.p.rapidapi.com/v1/posts', {
-      params: { username_or_id_or_url: username },
-      headers: {
-        'x-rapidapi-key': rapidApiKey,
-        'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+  for (const ep of profileEndpoints) {
+    try {
+      console.log(`Instagram: trying ${ep.url}`);
+      const res = await axios.get(ep.url, { params: ep.params, headers, timeout: 15000 });
+      if (res.data && !res.data.message) {
+        profileData = res.data;
+        console.log(`Instagram: success with ${ep.url}, keys: ${Object.keys(res.data)}`);
+        break;
       }
-    });
-
-    const rawPosts = postsRes.data?.data?.items || postsRes.data?.data || [];
-    posts = Array.isArray(rawPosts) ? rawPosts
-      .filter(p => !p.is_pinned)
-      .slice(0, 10)
-      .map(p => ({
-        title: (p.caption?.text || p.title || 'Untitled').substring(0, 80),
-        views: p.play_count || p.video_view_count || p.like_count || 0,
-        likes: p.like_count || 0,
-        comments: p.comment_count || 0,
-        publishedAt: p.taken_at ? new Date(p.taken_at * 1000).toISOString() : null
-      })) : [];
-  } catch (err) {
-    console.error('Instagram posts fetch error:', err.message);
-    // Continue with profile data even if posts fail
+    } catch (err) {
+      console.log(`Instagram: ${ep.url} failed — ${err.response?.status} ${err.response?.data?.message || err.message}`);
+      if (err.response?.status === 429) throw err; // Rate limited — stop trying
+      continue;
+    }
   }
 
-  const followers = userData.follower_count || 0;
+  if (!profileData) return null;
+
+  // Extract user data — handle different response shapes from the API
+  const userData = profileData.data || profileData.graphql?.user || profileData.user || profileData;
+  if (!userData || (!userData.follower_count && !userData.edge_followed_by)) return null;
+
+  const followers = userData.follower_count || userData.edge_followed_by?.count || 0;
+  const userId = userData.pk || userData.id || null;
+  const fullName = userData.full_name || username;
+  const profilePic = userData.profile_pic_url || userData.profile_pic_url_hd || '';
+
+  // Step 2: Try to get recent media via dedicated medias endpoint
+  let posts = [];
+  if (userId) {
+    try {
+      console.log(`Instagram: fetching medias for user ID ${userId}`);
+      const mediasRes = await axios.get(`https://${host}/api/v1/medias`, {
+        params: { user_id: userId },
+        headers,
+        timeout: 15000
+      });
+      const rawPosts = mediasRes.data?.data || mediasRes.data?.items || mediasRes.data || [];
+      if (Array.isArray(rawPosts) && rawPosts.length > 0) {
+        posts = rawPosts
+          .filter(p => !p.is_pinned)
+          .slice(0, 10)
+          .map(p => ({
+            title: (p.caption?.text || p.title || 'Untitled').substring(0, 80),
+            views: p.play_count || p.video_view_count || p.like_count || 0,
+            likes: p.like_count || 0,
+            comments: p.comment_count || 0,
+            publishedAt: p.taken_at ? new Date(p.taken_at * 1000).toISOString() : null
+          }));
+        console.log(`Instagram: got ${posts.length} posts from medias endpoint`);
+      }
+    } catch (err) {
+      console.log(`Instagram: medias endpoint failed — ${err.response?.status || err.message}`);
+    }
+  }
+
+  // Fallback: extract posts from profile response if medias endpoint didn't work
+  if (posts.length === 0) {
+    try {
+      const rawPosts = userData.edge_owner_to_timeline_media?.edges
+        || profileData.medias || profileData.data?.items || [];
+
+      if (Array.isArray(rawPosts) && rawPosts.length > 0) {
+        if (rawPosts[0]?.node) {
+          // Instagram graph format (edges)
+          posts = rawPosts
+            .filter(p => !p.node?.pinned_for_users?.length)
+            .slice(0, 10)
+            .map(p => {
+              const node = p.node;
+              const caption = node.edge_media_to_caption?.edges?.[0]?.node?.text || '';
+              return {
+                title: caption.substring(0, 80),
+                views: node.video_view_count || node.edge_liked_by?.count || 0,
+                likes: node.edge_liked_by?.count || 0,
+                comments: node.edge_media_to_comment?.count || 0,
+                publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null
+              };
+            });
+        } else {
+          // Flat array format
+          posts = rawPosts
+            .filter(p => !p.is_pinned)
+            .slice(0, 10)
+            .map(p => ({
+              title: (p.caption?.text || p.title || 'Untitled').substring(0, 80),
+              views: p.play_count || p.video_view_count || p.like_count || 0,
+              likes: p.like_count || 0,
+              comments: p.comment_count || 0,
+              publishedAt: p.taken_at ? new Date(p.taken_at * 1000).toISOString() : null
+            }));
+        }
+      }
+    } catch (err) {
+      console.error('Instagram posts parse error:', err.message);
+    }
+  }
+
   const totalEngagement = posts.reduce((sum, p) => sum + p.likes + p.comments, 0);
   const engagementRate = followers > 0 && posts.length > 0
     ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
@@ -332,8 +403,8 @@ async function fetchInstagramViaRapidAPI(username, rapidApiKey) {
 
   return {
     platform: 'instagram',
-    channelName: userData.full_name || username,
-    profileImage: userData.profile_pic_url || userData.profile_pic_url_hd || '',
+    channelName: fullName,
+    profileImage: profilePic,
     followers: followers,
     engagementRate: parseFloat(engagementRate),
     videos: posts
