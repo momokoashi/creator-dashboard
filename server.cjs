@@ -13,6 +13,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+// Serve the built React app (Vite outputs to ./dist). Falls back to ./public
+// so the server still boots before the first build.
+app.use(express.static(path.join(__dirname, 'dist')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/screenshots', express.static(path.join(__dirname, 'screenshots')));
 
@@ -534,6 +537,46 @@ app.post('/api/screenshot', async (req, res) => {
     console.error('Screenshot error:', err.message);
     res.status(500).json({ error: 'Failed to capture screenshot: ' + err.message });
   }
+});
+
+// ============================================================
+// AI Reply — drafts an outreach reply from the deal + creator's message.
+// Uses Claude when ANTHROPIC_API_KEY is set; otherwise returns the
+// deterministic rule-based reply so the feature never hard-fails.
+// ============================================================
+app.post('/api/reply', async (req, res) => {
+  const { creatorName, deal, theirReply } = req.body || {};
+  // reply.js is ESM; load it dynamically from this CommonJS server.
+  const { buildAiPrompt, ruleBasedReply } = await import('./src/lib/reply.js');
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.json({ reply: ruleBasedReply(creatorName, deal, theirReply), source: 'rule' });
+  }
+
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: buildAiPrompt(creatorName, deal, theirReply) }],
+    });
+    const text = (msg.content || []).map((b) => b.text || '').join('').trim();
+    if (!text) throw new Error('Empty completion');
+    res.json({ reply: text, source: 'ai' });
+  } catch (err) {
+    console.error('AI reply error:', err.message);
+    // Never leave the user stuck — fall back to deterministic copy.
+    res.json({ reply: ruleBasedReply(creatorName, deal, theirReply), source: 'rule', note: err.message });
+  }
+});
+
+// SPA fallback: any non-API, non-file route serves the React index.
+app.get(/^(?!\/api|\/screenshots).*/, (req, res) => {
+  const dist = path.join(__dirname, 'dist', 'index.html');
+  if (fs.existsSync(dist)) return res.sendFile(dist);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ============================================================
