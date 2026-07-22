@@ -89,6 +89,7 @@ h1, h2 { margin: 0; }
 /* ---- Inputs ---- */
 input, textarea, .bio { font-family: inherit; }
 .cost-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.handle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
 .cost-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .cost-field.block { grid-column: 1 / -1; }
 .cost-field input, .cost-field textarea {
