@@ -1,6 +1,6 @@
 {
   "name": "creator-dashboard",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Creator analytics + CPM deal-analysis dashboard (React rebuild)",
   "main": "server.cjs",
   "type": "module",
@@ -15,24 +15,25 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "//": "Build tooling (vite/react/etc) is intentionally in dependencies, NOT devDependencies, so it installs even when NODE_ENV=production on Render.",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
   },
   "optionalDependencies": {
     "puppeteer": "^24.38.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "typescript": "^5.6.3",
-    "vite": "^6.0.3"
+    "@types/react-dom": "^18.3.1"
   },
   "engines": {
     "node": ">=18.0.0"
