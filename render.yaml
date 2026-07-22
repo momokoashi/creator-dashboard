@@ -4,7 +4,9 @@ services:
     runtime: node
     plan: free
     # Install everything (Vite/TS are devDeps needed at build time), then build the React app.
-    buildCommand: npm install && npm run build
+    # --ignore-scripts skips Puppeteer's heavy Chromium download (screenshots are
+    # not used by the v2 UI); the app still boots fine without it.
+    buildCommand: npm install --ignore-scripts && npm run build
     startCommand: node server.cjs
     envVars:
       - key: YOUTUBE_API_KEY
