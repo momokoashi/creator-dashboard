@@ -3,12 +3,17 @@ services:
     name: creator-dashboard
     runtime: node
     plan: free
-    buildCommand: npm install --omit=dev --ignore-scripts
-    startCommand: node server.js
+    # Install everything (Vite/TS are devDeps needed at build time), then build the React app.
+    buildCommand: npm install && npm run build
+    startCommand: node server.cjs
     envVars:
       - key: YOUTUBE_API_KEY
         sync: false
       - key: RAPIDAPI_KEY
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-5
       - key: NODE_ENV
         value: production

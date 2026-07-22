@@ -1,17 +1,22 @@
 {
   "name": "creator-dashboard",
-  "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "Creator analytics + CPM deal-analysis dashboard (React rebuild)",
+  "main": "server.cjs",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.cjs",
+    "typecheck": "tsc --noEmit",
+    "test:logic": "node scripts/test-logic.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
     "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -19,6 +24,15 @@
   },
   "optionalDependencies": {
     "puppeteer": "^24.38.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.3"
   },
   "engines": {
     "node": ">=18.0.0"
