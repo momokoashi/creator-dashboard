@@ -19,15 +19,18 @@ export const DEFAULT_TARGET_CPM = 40;
 
 // Each buyable package: which cost field, which platform's median views it earns,
 // and which target-CPM field governs it. Bundles sum multiple platforms.
+// wlField: the whitelisting cost that attaches to this package; wlTargetField:
+// the with-usage-rights target that governs the combined price (falls back to
+// the base target when unset).
 const PACKAGES = [
-  { key: 'igReel',    label: 'IG Reel',            costField: 'costIgReel',    platforms: ['instagram'],            targetField: 'targetCpmInstagram' },
-  { key: 'igReels',   label: 'IG Reels (package)', costField: 'costIgReels',   platforms: ['instagram'],            targetField: 'targetCpmIgReels' },
-  { key: 'tiktok',    label: 'TikTok',             costField: 'costTiktok',    platforms: ['tiktok'],               targetField: 'targetCpmTiktok' },
-  { key: 'youtube',   label: 'YouTube',            costField: 'costYoutube',   platforms: ['youtube'],              targetField: 'targetCpmYoutube' },
-  { key: 'ytShorts',  label: 'YT Shorts',          costField: 'costYtShorts',  platforms: ['youtubeShorts'],        targetField: 'targetCpmYtShorts' },
+  { key: 'igReel',    label: 'IG Reel',            costField: 'costIgReel',    platforms: ['instagram'],            targetField: 'targetCpmInstagram', wlField: 'wlIg',       wlTargetField: 'targetCpmInstagramWl' },
+  { key: 'igReels',   label: 'IG Reels (package)', costField: 'costIgReels',   platforms: ['instagram'],            targetField: 'targetCpmIgReels',   wlField: 'wlIgReels',  wlTargetField: 'targetCpmIgReelsWl' },
+  { key: 'tiktok',    label: 'TikTok',             costField: 'costTiktok',    platforms: ['tiktok'],               targetField: 'targetCpmTiktok',    wlField: 'wlTiktok',   wlTargetField: 'targetCpmTiktokWl' },
+  { key: 'youtube',   label: 'YouTube',            costField: 'costYoutube',   platforms: ['youtube'],              targetField: 'targetCpmYoutube',   wlField: 'wlYoutube',  wlTargetField: 'targetCpmYoutubeWl' },
+  { key: 'ytShorts',  label: 'YT Shorts',          costField: 'costYtShorts',  platforms: ['youtubeShorts'],        targetField: 'targetCpmYtShorts',  wlField: 'wlYtShorts', wlTargetField: 'targetCpmYtShortsWl' },
   { key: 'podcast',   label: 'Podcast',            costField: 'costPodcast',   platforms: ['podcast'],              targetField: 'targetCpmPodcast' },
-  { key: 'bundleIgTt',label: 'Bundle (IG + TikTok)',costField: 'costBundleIgTt',platforms: ['instagram', 'tiktok'], targetField: 'targetCpmInstagram' },
-  { key: 'bundleAll', label: 'Full Bundle (All)',  costField: 'costBundleAll', platforms: ['instagram', 'tiktok', 'youtube', 'youtubeShorts'], targetField: 'targetCpmInstagram' },
+  { key: 'bundleIgTt',label: 'Bundle (IG + TikTok)',costField: 'costBundleIgTt',platforms: ['instagram', 'tiktok'], targetField: 'targetCpmInstagram', wlField: 'wlBundle',   wlTargetField: 'targetCpmInstagramWl' },
+  { key: 'bundleAll', label: 'Full Bundle (All)',  costField: 'costBundleAll', platforms: ['instagram', 'tiktok', 'youtube', 'youtubeShorts'], targetField: 'targetCpmInstagram', wlField: 'wlBundle', wlTargetField: 'targetCpmInstagramWl' },
 ];
 
 /** Sum of median views across one or more platforms. */
@@ -35,20 +38,9 @@ function combinedMedian(creator, platforms) {
   return platforms.reduce((sum, pk) => sum + platformStats(creator, pk).median, 0);
 }
 
-/**
- * Evaluate one package. Returns null if the package has no cost set
- * (nothing to decide on).
- */
-function evaluatePackage(creator, pkg) {
-  const costs = creator.costs || {};
-  const targets = creator.targetCpms || {};
-  const cost = Number(costs[pkg.costField]) || 0;
-  if (cost <= 0) return null;
-
-  const medianViews = combinedMedian(creator, pkg.platforms);
+/** Score one price against a target CPM on the median views seen. */
+function judge(cost, medianViews, target) {
   const actualCpm = cpm(cost, medianViews); // null when no views yet
-  const target = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
-
   let decision = 'UNKNOWN';
   let counterPrice = null;
   if (actualCpm != null) {
@@ -58,18 +50,49 @@ function evaluatePackage(creator, pkg) {
     // A fair counter pays exactly the target CPM on the median views seen.
     counterPrice = (target * medianViews) / 1000;
   }
+  return { actualCpm, decision, counterPrice };
+}
 
-  return {
+/**
+ * Evaluate one package. Returns [] if the package has no cost set
+ * (nothing to decide on); otherwise the content-only evaluation plus,
+ * when a whitelisting cost is set, a second "+ WL" evaluation of the
+ * combined price against the with-usage-rights target.
+ */
+function evaluatePackage(creator, pkg) {
+  const costs = creator.costs || {};
+  const targets = creator.targetCpms || {};
+  const cost = Number(costs[pkg.costField]) || 0;
+  if (cost <= 0) return [];
+
+  const medianViews = combinedMedian(creator, pkg.platforms);
+  const target = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
+
+  const results = [{
     key: pkg.key,
     label: pkg.label,
     cost,
     medianViews,
-    actualCpm,
     target,
     usingDefaultTarget: !targets[pkg.targetField],
-    decision,
-    counterPrice,
-  };
+    ...judge(cost, medianViews, target),
+  }];
+
+  const wlCost = pkg.wlField ? Number(costs[pkg.wlField]) || 0 : 0;
+  if (wlCost > 0) {
+    const wlTarget = Number(targets[pkg.wlTargetField]) || target;
+    results.push({
+      key: pkg.key + 'Wl',
+      label: pkg.label + ' + WL',
+      cost: cost + wlCost,
+      medianViews,
+      target: wlTarget,
+      usingDefaultTarget: !targets[pkg.wlTargetField] && !targets[pkg.targetField],
+      ...judge(cost + wlCost, medianViews, wlTarget),
+    });
+  }
+
+  return results;
 }
 
 const RANK = { ACCEPT: 3, COUNTER: 2, PASS: 1, UNKNOWN: 0 };
@@ -82,9 +105,7 @@ const RANK = { ACCEPT: 3, COUNTER: 2, PASS: 1, UNKNOWN: 0 };
  * }}
  */
 export function evaluateDeal(creator) {
-  const packages = PACKAGES
-    .map((p) => evaluatePackage(creator, p))
-    .filter(Boolean);
+  const packages = PACKAGES.flatMap((p) => evaluatePackage(creator, p));
 
   if (!packages.length) {
     return { packages: [], overall: null };
