@@ -37,6 +37,10 @@ export default function Summary({ creator, deal, update }) {
     update({ costs: { ...creator.costs, [field]: Number(val) || 0 } });
   }
 
+  function setUrl(key, val) {
+    update({ urls: { ...creator.urls, [key]: val } });
+  }
+
   const overall = deal?.overall;
   const overridden = !!creator.override;
   const shownDecision = overridden ? creator.override.decision : overall?.decision || 'UNKNOWN';
@@ -51,6 +55,14 @@ export default function Summary({ creator, deal, update }) {
         <div className="card-head">
           <h2>Bio</h2>
         </div>
+        <label className="cost-field block">
+          <span>Creator name</span>
+          <input
+            type="text" placeholder="Creator name"
+            value={creator.name || ''}
+            onChange={(e) => update({ name: e.target.value })}
+          />
+        </label>
         <textarea
           className="bio"
           placeholder="Short bio — who they are and why they're famous…"
@@ -58,11 +70,23 @@ export default function Summary({ creator, deal, update }) {
           onChange={(e) => update({ bio: e.target.value })}
           rows={3}
         />
+        <div className="handle-grid">
+          {CHANNELS.map(([key, label]) => (
+            <label key={key} className="cost-field">
+              <span>{label} handle</span>
+              <input
+                type="text" placeholder="@handle or URL"
+                value={creator.urls?.[key] || ''}
+                onChange={(e) => setUrl(key, e.target.value)}
+              />
+            </label>
+          ))}
+        </div>
         <div className="channels">
           {CHANNELS.map(([key, label]) => {
             const url = creator.urls?.[key];
             return url ? (
-              <a key={key} className="channel-link" href={normalizeUrl(url)} target="_blank" rel="noreferrer">
+              <a key={key} className="channel-link" href={normalizeUrl(key, url)} target="_blank" rel="noreferrer">
                 {label} ↗
               </a>
             ) : (
@@ -190,9 +214,17 @@ function OverrideControl({ creator, update }) {
   );
 }
 
-function normalizeUrl(u) {
+const HANDLE_URLS = {
+  instagram: (h) => 'https://instagram.com/' + h,
+  tiktok: (h) => 'https://www.tiktok.com/@' + h,
+  youtube: (h) => 'https://www.youtube.com/@' + h,
+};
+
+function normalizeUrl(key, u) {
   if (!u) return '#';
   if (u.startsWith('http')) return u;
-  if (u.startsWith('@')) return 'https://instagram.com/' + u.slice(1);
-  return 'https://' + u;
+  const handle = u.startsWith('@') ? u.slice(1) : u;
+  if (u.includes('.') && !u.startsWith('@')) return 'https://' + u;
+  const toUrl = HANDLE_URLS[key];
+  return toUrl ? toUrl(handle) : 'https://' + u;
 }
