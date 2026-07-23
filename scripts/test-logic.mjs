@@ -50,4 +50,26 @@ console.log('Detected intent:', detectIntent(theirReply));
 console.log('Suggested reply:', ruleBasedReply(emily.name, deal, theirReply));
 
 console.log(`\n(Default target CPM = $${DEFAULT_TARGET_CPM})`);
+
+// Whitelisting-aware evaluation: a WL cost adds a "+ WL" row judged
+// against the with-usage-rights target (falling back to the base target).
+console.log('\n=== WHITELISTING PACKAGES ===');
+const wlCreator = {
+  ...emily,
+  costs: { costIgReel: 100, wlIg: 150 },
+  targetCpms: { targetCpmInstagram: 15, targetCpmInstagramWl: 35 },
+};
+const wlDeal = evaluateDeal(wlCreator);
+for (const p of wlDeal.packages) {
+  console.log(
+    `${p.label.padEnd(20)} cost $${p.cost} | CPM $${p.actualCpm?.toFixed(2)} | target $${p.target} -> ${p.decision}`
+  );
+}
+const base = wlDeal.packages.find((p) => p.key === 'igReel');
+const wl = wlDeal.packages.find((p) => p.key === 'igReelWl');
+if (!wl) throw new Error('WL package missing');
+if (wl.cost !== 250) throw new Error('WL cost should be base + WL (250), got ' + wl.cost);
+if (wl.target !== 35) throw new Error('WL target should use targetCpmInstagramWl (35), got ' + wl.target);
+if (base.cost !== 100) throw new Error('Base package cost changed unexpectedly');
+
 console.log('\nOK — logic ran clean.');

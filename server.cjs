@@ -26,6 +26,41 @@ if (!fs.existsSync(screenshotsDir)) {
 }
 
 // ============================================================
+// In-memory TTL cache for scrape results — repeat fetches of the same
+// profile within the window cost zero RapidAPI credits / YouTube quota
+// and dodge Instagram's rate limit. Pass ?force=1 to bypass.
+// ============================================================
+const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const apiCache = new Map();
+
+function cacheGet(key) {
+  const hit = apiCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.fetchedAt > CACHE_TTL_MS) { apiCache.delete(key); return null; }
+  return hit;
+}
+
+function cacheSet(key, data) {
+  const entry = { fetchedAt: Date.now(), data };
+  apiCache.set(key, entry);
+  return entry;
+}
+
+/** Send a payload and remember it; cached replies carry the original fetchedAt. */
+function sendCached(res, key, data) {
+  const entry = cacheSet(key, data);
+  res.json({ ...data, fetchedAt: entry.fetchedAt });
+}
+
+function tryCache(req, res, key) {
+  if (req.query.force) return false;
+  const hit = cacheGet(key);
+  if (!hit) return false;
+  res.json({ ...hit.data, fetchedAt: hit.fetchedAt, cached: true });
+  return true;
+}
+
+// ============================================================
 // YouTube API (Official — FREE, no RapidAPI cost)
 // ============================================================
 
@@ -39,6 +74,7 @@ app.get('/api/youtube/channel', async (req, res) => {
   if (!url) {
     return res.status(400).json({ error: 'URL parameter required' });
   }
+  if (tryCache(req, res, 'yt:' + url)) return;
 
   try {
     const channelId = await resolveYouTubeChannel(url, apiKey);
@@ -118,7 +154,7 @@ app.get('/api/youtube/channel', async (req, res) => {
     const engagementRate = totalVideoViews > 0
       ? ((totalLikes + totalComments) / totalVideoViews * 100).toFixed(2) : 0;
 
-    res.json({
+    sendCached(res, 'yt:' + url, {
       platform: 'youtube',
       channelName: channel.snippet.title,
       profileImage: channel.snippet.thumbnails.default.url,
@@ -196,6 +232,7 @@ app.get('/api/tiktok/profile', async (req, res) => {
   try {
     // Using TikTok API on RapidAPI
     const cleanUsername = username.replace('@', '').replace('https://www.tiktok.com/', '').split('/')[0].split('?')[0];
+    if (tryCache(req, res, 'tt:' + cleanUsername)) return;
 
     const profileRes = await axios.get('https://tiktok-scraper7.p.rapidapi.com/user/info', {
       params: { unique_id: cleanUsername },
@@ -241,7 +278,7 @@ app.get('/api/tiktok/profile', async (req, res) => {
     const totalViews = videos.reduce((sum, v) => sum + v.views, 0);
     const engagementRate = totalViews > 0 ? ((totalLikes / totalViews) * 100).toFixed(2) : 0;
 
-    res.json({
+    sendCached(res, 'tt:' + cleanUsername, {
       platform: 'tiktok',
       channelName: userData.nickname || cleanUsername,
       profileImage: userData.avatarThumb || '',
@@ -270,12 +307,13 @@ app.get('/api/instagram/profile', async (req, res) => {
   }
 
   const cleanUser = username.replace('@', '').replace('https://www.instagram.com/', '').split('/')[0].split('?')[0];
+  if (tryCache(req, res, 'ig:' + cleanUser)) return;
 
   // Strategy 1: Instagram Looter API on RapidAPI (reliable, paid)
   if (rapidApiKey) {
     try {
       const result = await fetchInstagramViaLooter(cleanUser, rapidApiKey);
-      if (result) return res.json(result);
+      if (result) return sendCached(res, 'ig:' + cleanUser, result);
     } catch (err) {
       console.error('Instagram Looter API error:', err.response?.data?.message || err.message);
       // Fall through to direct API
@@ -285,7 +323,7 @@ app.get('/api/instagram/profile', async (req, res) => {
   // Strategy 2: Instagram's direct public web API (free but rate-limited)
   try {
     const result = await fetchInstagramDirect(cleanUser);
-    if (result) return res.json(result);
+    if (result) return sendCached(res, 'ig:' + cleanUser, result);
     return res.status(404).json({ error: 'Instagram user not found' });
   } catch (err) {
     console.error('Instagram direct API error:', err.response?.data || err.message);
