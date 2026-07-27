@@ -16,6 +16,17 @@ const FRESH_MS = 24 * 60 * 60 * 1000; // 24h — user-chosen cutoff
 // Caption markers that identify a sponsored/branded post.
 const SPONSORED_RE = /#ad\b|#sponsored\b|#sponsor\b|#gifted\b|#brandpartner\b|paid partnership|in partnership with|#partner\b/i;
 
+/**
+ * Is this video sponsored? A manual tag (v.sponsored true/false, set by
+ * clicking in the video list) always beats caption auto-detection — captions
+ * miss "Paid partnership" label-only posts and undisclosed ads.
+ */
+export function isSponsored(v) {
+  if (v?.sponsored === true) return true;
+  if (v?.sponsored === false) return false;
+  return SPONSORED_RE.test(v?.title || '');
+}
+
 /** @returns {object[]} eligible (>24h old or undated) videos with numeric views. */
 function eligibleVideos(creator, platformKey) {
   const p = creator?.platforms?.[platformKey];
@@ -81,8 +92,8 @@ export function platformStats(creator, platformKey) {
   }
 
   // Sponsored vs organic: what does a branded post really do on this account?
-  const sponsViews = eligible.filter((v) => SPONSORED_RE.test(v?.title || '')).map((v) => Number(v.views));
-  const organicViews = eligible.filter((v) => !SPONSORED_RE.test(v?.title || '')).map((v) => Number(v.views));
+  const sponsViews = eligible.filter(isSponsored).map((v) => Number(v.views));
+  const organicViews = eligible.filter((v) => !isSponsored(v)).map((v) => Number(v.views));
   const sponsoredFactor =
     sponsViews.length >= 2 && organicViews.length >= 2 && median(organicViews) > 0
       ? median(sponsViews) / median(organicViews)

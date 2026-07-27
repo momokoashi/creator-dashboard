@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { platformStats } from '../lib/cpm.js';
+import { platformStats, isSponsored } from '../lib/cpm.js';
 import { formatNumber } from '../lib/format.js';
-import { videosToStore } from '../lib/quickadd.js';
+import { videosToStore, carryManualTags } from '../lib/quickadd.js';
 
 // Target CPM inputs — these replace the old CPM calculator.
 const TARGETS = [
@@ -46,8 +46,9 @@ function toPatch(json, existing, useShorts) {
     engagementRate: json.engagementRate ?? existing.engagementRate,
     bio: json.bio || existing.bio || '',
     // Full objects (title/date/likes), not just view counts, so the UI can
-    // list the last 10 videos instead of a bare count.
-    videos: videosToStore(videos),
+    // list the last 10 videos instead of a bare count. Manual sponsored
+    // tags survive the re-fetch via carryManualTags.
+    videos: carryManualTags(videosToStore(videos), existing.videos),
     viewsAreLikes: !!json.viewsAreLikes,
     fetchedAt: json.fetchedAt || Date.now(),
   };
@@ -171,6 +172,18 @@ function PlatformCard({ p, creator, update }) {
     patchPlatform({ videos: nums.map((views) => ({ views })) });
   }
 
+  // Cycle a video's sponsored tag: auto-detect -> AD -> organic -> auto.
+  function tagVideo(idx) {
+    const vids = [...(data.videos || [])];
+    const v = vids[idx];
+    if (!v) return;
+    const next = v.sponsored == null ? true : v.sponsored === true ? false : null;
+    const nv: any = { ...v };
+    if (next == null) delete nv.sponsored; else nv.sponsored = next;
+    vids[idx] = nv;
+    patchPlatform({ videos: vids });
+  }
+
   async function fetchLive() {
     const handle = creator.urls?.[p.urlKey];
     if (!p.fetch || !handle) { setErr('No handle set / manual only'); return; }
@@ -276,7 +289,7 @@ function PlatformCard({ p, creator, update }) {
         </p>
       )}
 
-      <VideoList videos={data.videos} median={stats.median} />
+      <VideoList videos={data.videos} median={stats.median} onTag={tagVideo} />
 
       <details className="manual-views">
         <summary className="muted small">Manual entry (comma-separated views)</summary>
@@ -294,24 +307,48 @@ function PlatformCard({ p, creator, update }) {
 
 // Last-10 list — the per-video detail that a bare count hides. Views above
 // the median glow green, below glow red, so fluctuation is visible at a glance.
-function VideoList({ videos, median }) {
-  const rich = (videos || []).filter((v) => v.title || v.publishedAt);
-  if (!rich.length) return null;
+// The Ad column is click-to-cycle (auto-detect -> AD -> organic -> auto) so
+// undisclosed or label-only sponsored posts can be tagged by hand — manual
+// tags feed the ad factor and survive re-fetches.
+function VideoList({ videos, median, onTag }) {
+  const rows = (videos || [])
+    .map((v, idx) => ({ v, idx }))
+    .filter(({ v }) => v.title || v.publishedAt);
+  if (!rows.length) return null;
   return (
-    <table className="video-list">
-      <thead>
-        <tr><th>#</th><th>Video</th><th>Date</th><th className="num">Views</th></tr>
-      </thead>
-      <tbody>
-        {rich.slice(0, 10).map((v, i) => (
-          <tr key={i}>
-            <td className="muted">{i + 1}</td>
-            <td className="video-title" title={v.title}>{v.title || '—'}</td>
-            <td className="muted">{v.publishedAt ? new Date(v.publishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</td>
-            <td className={'num ' + (median && v.views >= median ? 'views-hi' : 'views-lo')}>{formatNumber(v.views)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <>
+      <table className="video-list">
+        <thead>
+          <tr><th>#</th><th>Video</th><th>Date</th><th>Ad</th><th className="num">Views</th></tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, 10).map(({ v, idx }, i) => {
+            const sponsored = isSponsored(v);
+            const manual = v.sponsored != null;
+            return (
+              <tr key={idx}>
+                <td className="muted">{i + 1}</td>
+                <td className="video-title" title={v.title}>{v.title || '—'}</td>
+                <td className="muted">{v.publishedAt ? new Date(v.publishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</td>
+                <td>
+                  <button
+                    className={'tag-btn' + (sponsored ? ' tag-ad' : ' tag-org') + (manual ? ' tag-manual' : '')}
+                    title={
+                      (sponsored ? 'Sponsored' : 'Organic') + (manual ? ' (tagged by hand)' : ' (auto-detected from caption)') +
+                      ' — click to change: auto → AD → organic → auto'
+                    }
+                    onClick={() => onTag && onTag(idx)}
+                  >
+                    {sponsored ? 'AD' : 'org'}{manual ? ' ✓' : ''}
+                  </button>
+                </td>
+                <td className={'num ' + (median && v.views >= median ? 'views-hi' : 'views-lo')}>{formatNumber(v.views)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="fineprint">Click the Ad column to tag posts the caption scan missed (e.g. "Paid partnership" label-only). Tags refine the ad factor and stick across re-fetches.</p>
+    </>
   );
 }

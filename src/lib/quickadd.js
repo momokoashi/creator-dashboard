@@ -51,7 +51,26 @@ export function videosToStore(videos) {
     likes: Number(v.likes) || 0,
     comments: Number(v.comments) || 0,
     publishedAt: v.publishedAt || null,
+    ...(v.sponsored != null ? { sponsored: v.sponsored } : {}),
   }));
+}
+
+/**
+ * Carry manual sponsored tags across a re-fetch: match the fresh videos to
+ * the previously stored ones (by publish date, falling back to title) and
+ * keep any true/false tag the user set by hand.
+ */
+export function carryManualTags(freshVideos, oldVideos) {
+  const old = oldVideos || [];
+  return (freshVideos || []).map((v) => {
+    const match = old.find(
+      (o) =>
+        o.sponsored != null &&
+        ((o.publishedAt && v.publishedAt && o.publishedAt === v.publishedAt) ||
+          (o.title && v.title && o.title === v.title))
+    );
+    return match ? { ...v, sponsored: match.sponsored } : v;
+  });
 }
 
 /** Build the platforms patch for one fetched payload (fills Shorts too for YouTube). */
@@ -60,7 +79,7 @@ export function platformPatchFromFetch(platform, json, existingPlatforms = {}) {
     followers: json.followers ?? 0,
     engagementRate: json.engagementRate ?? 0,
     bio: json.bio || '',
-    videos: videosToStore(json.videos),
+    videos: carryManualTags(videosToStore(json.videos), existingPlatforms[platform]?.videos),
     viewsAreLikes: !!json.viewsAreLikes,
     fetchedAt: json.fetchedAt || Date.now(),
   };
@@ -70,7 +89,7 @@ export function platformPatchFromFetch(platform, json, existingPlatforms = {}) {
       ...(existingPlatforms.youtubeShorts || {}),
       followers: base.followers,
       engagementRate: base.engagementRate,
-      videos: videosToStore(json.shorts),
+      videos: carryManualTags(videosToStore(json.shorts), existingPlatforms.youtubeShorts?.videos),
       fetchedAt: base.fetchedAt,
     };
   }
