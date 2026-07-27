@@ -12,7 +12,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+// 15mb so pasted conversation screenshots (base64) fit in /api/reply.
+app.use(express.json({ limit: '15mb' }));
 // Serve the built React app (Vite outputs to ./dist). Falls back to ./public
 // so the server still boots before the first build.
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -158,6 +159,7 @@ app.get('/api/youtube/channel', async (req, res) => {
       platform: 'youtube',
       channelName: channel.snippet.title,
       profileImage: channel.snippet.thumbnails.default.url,
+      bio: (channel.snippet.description || '').substring(0, 300),
       followers: parseInt(stats.subscriberCount) || 0,
       totalViews: parseInt(stats.viewCount) || 0,
       engagementRate: parseFloat(engagementRate),
@@ -282,6 +284,7 @@ app.get('/api/tiktok/profile', async (req, res) => {
       platform: 'tiktok',
       channelName: userData.nickname || cleanUsername,
       profileImage: userData.avatarThumb || '',
+      bio: (userData.signature || '').substring(0, 300),
       followers: followers,
       engagementRate: parseFloat(engagementRate),
       videos: videos
@@ -441,6 +444,7 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
     platform: 'instagram',
     channelName: fullName,
     profileImage: profilePic,
+    bio: (data.biography || '').substring(0, 300),
     followers: followers,
     engagementRate: parseFloat(engagementRate),
     videos: posts,
@@ -487,6 +491,7 @@ async function fetchInstagramDirect(username) {
     platform: 'instagram',
     channelName: userData.full_name || username,
     profileImage: userData.profile_pic_url || '',
+    bio: (userData.biography || '').substring(0, 300),
     followers: followers,
     engagementRate: parseFloat(engagementRate),
     videos: posts
@@ -583,7 +588,7 @@ app.post('/api/screenshot', async (req, res) => {
 // deterministic rule-based reply so the feature never hard-fails.
 // ============================================================
 app.post('/api/reply', async (req, res) => {
-  const { creatorName, deal, theirReply } = req.body || {};
+  const { creatorName, deal, theirReply, imageBase64, imageMediaType, history } = req.body || {};
   // reply.js is ESM; load it dynamically from this CommonJS server.
   const { buildAiPrompt, ruleBasedReply } = await import('./src/lib/reply.js');
 
@@ -595,10 +600,22 @@ app.post('/api/reply', async (req, res) => {
   try {
     const Anthropic = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey });
+
+    let prompt = buildAiPrompt(creatorName, deal, theirReply, 'Hello Nancy', history);
+    const content = [];
+    if (imageBase64) {
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: imageMediaType || 'image/png', data: imageBase64 },
+      });
+      prompt += '\n\nA screenshot of the conversation (email or chat) is attached. Read it for full context — sender, tone, any numbers or asks — and reply to their latest message. The screenshot is the source of truth if it conflicts with the pasted text.';
+    }
+    content.push({ type: 'text', text: prompt });
+
     const msg = await client.messages.create({
       model: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: buildAiPrompt(creatorName, deal, theirReply) }],
+      max_tokens: 500,
+      messages: [{ role: 'user', content }],
     });
     const text = (msg.content || []).map((b) => b.text || '').join('').trim();
     if (!text) throw new Error('Empty completion');
@@ -607,6 +624,54 @@ app.post('/api/reply', async (req, res) => {
     console.error('AI reply error:', err.message);
     // Never leave the user stuck — fall back to deterministic copy.
     res.json({ reply: ruleBasedReply(creatorName, deal, theirReply), source: 'rule', note: err.message });
+  }
+});
+
+// ============================================================
+// AI Bio — writes the one-line "who they are & why they're famous"
+// from fetched platform bios + stats. Falls back to the raw platform
+// bio so the button always fills something.
+// ============================================================
+app.post('/api/bio', async (req, res) => {
+  const { name, platformBios, followers, handles } = req.body || {};
+  const raw = Object.values(platformBios || {}).filter(Boolean).join(' | ');
+  const fallback = raw.substring(0, 240);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !raw) {
+    return res.json({ bio: fallback, source: 'raw' });
+  }
+
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey });
+    const followerLine = Object.entries(followers || {})
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${k}: ${Number(n).toLocaleString()} followers`)
+      .join(', ');
+    const msg = await client.messages.create({
+      model: process.env.CLAUDE_MODEL || 'claude-sonnet-5',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: [
+          `Write a 1-2 sentence bio of a creator for an internal partnerships dashboard: who they are, what they make content about, and why they matter. Plain text, no hashtags, no emoji, max 40 words.`,
+          ``,
+          `Name: ${name || 'Unknown'}`,
+          handles ? `Handles: ${Object.entries(handles).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')}` : null,
+          followerLine ? `Audience: ${followerLine}` : null,
+          `Their own platform bios: ${raw}`,
+          ``,
+          `Reply with only the bio text.`,
+        ].filter((l) => l != null).join('\n'),
+      }],
+    });
+    const text = (msg.content || []).map((b) => b.text || '').join('').trim();
+    if (!text) throw new Error('Empty completion');
+    res.json({ bio: text, source: 'ai' });
+  } catch (err) {
+    console.error('AI bio error:', err.message);
+    res.json({ bio: fallback, source: 'raw', note: err.message });
   }
 });
 

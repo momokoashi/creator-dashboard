@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { platformStats } from '../lib/cpm.js';
 import { formatNumber } from '../lib/format.js';
+import { videosToStore } from '../lib/quickadd.js';
 
 // Target CPM inputs — these replace the old CPM calculator.
 const TARGETS = [
@@ -43,7 +44,10 @@ function toPatch(json, existing, useShorts) {
   return {
     followers: json.followers ?? existing.followers,
     engagementRate: json.engagementRate ?? existing.engagementRate,
-    videos: videos.map((v) => ({ views: Number(v.views) || 0 })),
+    bio: json.bio || existing.bio || '',
+    // Full objects (title/date/likes), not just view counts, so the UI can
+    // list the last 10 videos instead of a bare count.
+    videos: videosToStore(videos),
     fetchedAt: json.fetchedAt || Date.now(),
   };
 }
@@ -58,7 +62,7 @@ function timeAgo(ts) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-export default function Analytics({ creator, update }) {
+export default function Analytics({ creator, deal, update }: any) {
   const [busyAll, setBusyAll] = useState(false);
   const [allErr, setAllErr] = useState('');
 
@@ -71,7 +75,7 @@ export default function Analytics({ creator, update }) {
   async function fetchAll() {
     setBusyAll(true);
     setAllErr('');
-    const patches = {};
+    const patches: any = {};
     const errors = [];
     for (const p of PLATFORMS) {
       if (!p.fetch) continue;
@@ -88,7 +92,14 @@ export default function Analytics({ creator, update }) {
       }
     }
     if (Object.keys(patches).length) {
-      update({ platforms: { ...creator.platforms, ...patches } });
+      const patch: any = { platforms: { ...creator.platforms, ...patches } };
+      // Auto-fill the bio from the first platform that has one (never
+      // overwrite something already written by hand).
+      if (!creator.bio) {
+        const fetchedBio = Object.values(patches).map((p: any) => p.bio).find(Boolean);
+        if (fetchedBio) patch.bio = fetchedBio;
+      }
+      update(patch);
     }
     setAllErr(errors.join(' · '));
     setBusyAll(false);
@@ -165,7 +176,10 @@ function PlatformCard({ p, creator, update }) {
     setBusy(true); setErr('');
     try {
       const json = await fetchPlatformData(p, handle);
-      patchPlatform(toPatch(json, data, p.key === 'youtubeShorts'));
+      const platformPatch = toPatch(json, data, p.key === 'youtubeShorts');
+      const patch: any = { platforms: { ...creator.platforms, [p.key]: { ...data, ...platformPatch } } };
+      if (!creator.bio && platformPatch.bio) patch.bio = platformPatch.bio;
+      update(patch);
     } catch (e) {
       setErr(e.message || 'Fetch failed (API key required on server)');
     } finally {
@@ -197,14 +211,6 @@ function PlatformCard({ p, creator, update }) {
         </label>
       </div>
 
-      <label className="cost-field block">
-        <span>Recent view counts (comma-separated)</span>
-        {/* key remounts the input when data changes, so a live fetch replaces
-            the displayed text instead of leaving the stale defaultValue */}
-        <input key={viewsCsv} type="text" placeholder="22354, 6965, 209 …" defaultValue={viewsCsv}
-          onBlur={(e) => setViews(e.target.value)} />
-      </label>
-
       <div className="metrics">
         <div className="metric primary">
           <span className="metric-label">Median</span>
@@ -223,7 +229,43 @@ function PlatformCard({ p, creator, update }) {
           <span className="metric-value muted">{stats.count}</span>
         </div>
       </div>
+
+      <VideoList videos={data.videos} median={stats.median} />
+
+      <details className="manual-views">
+        <summary className="muted small">Manual entry (comma-separated views)</summary>
+        <label className="cost-field block">
+          {/* key remounts the input when data changes, so a live fetch replaces
+              the displayed text instead of leaving the stale defaultValue */}
+          <input key={viewsCsv} type="text" placeholder="22354, 6965, 209 …" defaultValue={viewsCsv}
+            onBlur={(e) => setViews(e.target.value)} />
+        </label>
+      </details>
       {err && <p className="error-text">{err}</p>}
     </div>
+  );
+}
+
+// Last-10 list — the per-video detail that a bare count hides. Views above
+// the median glow green, below glow red, so fluctuation is visible at a glance.
+function VideoList({ videos, median }) {
+  const rich = (videos || []).filter((v) => v.title || v.publishedAt);
+  if (!rich.length) return null;
+  return (
+    <table className="video-list">
+      <thead>
+        <tr><th>#</th><th>Video</th><th>Date</th><th className="num">Views</th></tr>
+      </thead>
+      <tbody>
+        {rich.slice(0, 10).map((v, i) => (
+          <tr key={i}>
+            <td className="muted">{i + 1}</td>
+            <td className="video-title" title={v.title}>{v.title || '—'}</td>
+            <td className="muted">{v.publishedAt ? new Date(v.publishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '—'}</td>
+            <td className={'num ' + (median && v.views >= median ? 'views-hi' : 'views-lo')}>{formatNumber(v.views)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

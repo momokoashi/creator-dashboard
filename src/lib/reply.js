@@ -112,7 +112,7 @@ export function ruleBasedReply(creatorName, deal, theirReply, brand = 'Hello Nan
  * Build the prompt for Claude to draft a tailored reply. Kept here so both
  * the server and tests can construct it identically.
  */
-export function buildAiPrompt(creatorName, deal, theirReply, brand = 'Hello Nancy') {
+export function buildAiPrompt(creatorName, deal, theirReply, brand = 'Hello Nancy', history = []) {
   const best = deal?.overall?.package;
   const facts = best
     ? [
@@ -125,6 +125,13 @@ export function buildAiPrompt(creatorName, deal, theirReply, brand = 'Hello Nanc
       ].filter(Boolean).join('\n')
     : 'No deal numbers computed yet.';
 
+  // Earlier exchanges (newest last) so follow-ups stay consistent with what
+  // we already said — no re-opening at a number we've moved past.
+  const past = (history || [])
+    .slice(-3)
+    .map((h, i) => `Exchange ${i + 1}:\nThem: "${h.theirReply || '(screenshot only)'}"\nUs: "${h.draft || ''}"`)
+    .join('\n\n');
+
   return [
     `You are a partnerships manager for ${brand}, a women's sexual-wellness brand.`,
     `Write a warm, concise, professional reply to a creator named "${creatorName}".`,
@@ -132,10 +139,11 @@ export function buildAiPrompt(creatorName, deal, theirReply, brand = 'Hello Nanc
     ``,
     `DEAL CONTEXT:`,
     facts,
+    past ? `\nEARLIER EXCHANGES IN THIS NEGOTIATION (stay consistent with what we already offered):\n${past}` : null,
     ``,
     `THE CREATOR JUST REPLIED:`,
     `"""${theirReply || '(no message yet — write the opening outreach)'}"""`,
     ``,
     `Write only the reply text, ready to send.`,
-  ].join('\n');
+  ].filter((l) => l != null).join('\n');
 }

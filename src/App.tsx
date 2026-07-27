@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadCreators, saveCreators, newCreatorId } from './lib/store.js';
 import { evaluateDeal } from './lib/decision.js';
+import { parseHandleInput, fetchProfile, platformPatchFromFetch } from './lib/quickadd.js';
 import Sidebar from './components/Sidebar';
 import Summary from './pages/Summary';
 import Analytics from './pages/Analytics';
@@ -46,6 +47,46 @@ export default function App() {
     setTab('summary');
   }
 
+  /**
+   * Paste-a-handle add: creates the creator immediately (so the UI never
+   * blocks), then auto-fetches the profile to fill name, bio, followers
+   * and the last-10 videos. On fetch failure the creator stays with the
+   * handle prefilled for a manual fetch later.
+   */
+  async function quickAddCreator(input) {
+    const parsed = parseHandleInput(input);
+    if (!parsed) { addCreator(); return; }
+
+    const c = {
+      id: newCreatorId(),
+      name: parsed.handle,
+      bio: '', urls: { [parsed.platform === 'youtube' ? 'youtube' : parsed.platform]: parsed.handle },
+      platforms: {}, costs: {}, targetCpms: {},
+      override: null, conversations: [],
+    };
+    setCreators((list) => [...list, c]);
+    setSelectedId(c.id);
+    setTab('summary');
+
+    try {
+      const json = await fetchProfile(parsed.platform, input.trim().startsWith('http') ? input.trim() : parsed.handle);
+      setCreators((list) =>
+        list.map((x) =>
+          x.id === c.id
+            ? {
+                ...x,
+                name: json.channelName || x.name,
+                bio: x.bio || json.bio || '',
+                platforms: { ...x.platforms, ...platformPatchFromFetch(parsed.platform, json, x.platforms) },
+              }
+            : x
+        )
+      );
+    } catch (e) {
+      console.warn('Quick-add fetch failed (creator kept, fetch manually):', e.message);
+    }
+  }
+
   function deleteCreator(id) {
     setCreators((list) => {
       const next = list.filter((c) => c.id !== id);
@@ -66,6 +107,7 @@ export default function App() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onAdd={addCreator}
+        onQuickAdd={quickAddCreator}
         onDelete={deleteCreator}
         search={search}
         onSearch={setSearch}

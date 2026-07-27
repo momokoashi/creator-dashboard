@@ -32,9 +32,33 @@ const CHANNELS = [
 export default function Summary({ creator, deal, update }) {
   // Nudge to force a visual "recalculated" pulse; the numbers are already reactive.
   const [pulse, setPulse] = useState(0);
+  const [bioBusy, setBioBusy] = useState(false);
 
   function setCost(field, val) {
     update({ costs: { ...creator.costs, [field]: Number(val) || 0 } });
+  }
+
+  // Auto-fill bio from fetched platform bios (AI-polished when the server
+  // has a key; raw platform bio otherwise).
+  async function autoFillBio() {
+    setBioBusy(true);
+    try {
+      const platformBios: any = {};
+      const followers: any = {};
+      for (const [key, p] of Object.entries<any>(creator.platforms || {})) {
+        if (p?.bio) platformBios[key] = p.bio;
+        if (p?.followers) followers[key] = p.followers;
+      }
+      const res = await fetch('/api/bio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: creator.name, platformBios, followers, handles: creator.urls }),
+      });
+      const json = await res.json();
+      if (json.bio) update({ bio: json.bio });
+    } catch { /* leave bio as-is */ } finally {
+      setBioBusy(false);
+    }
   }
 
   function setUrl(key, val) {
@@ -54,6 +78,9 @@ export default function Summary({ creator, deal, update }) {
       <div className="card">
         <div className="card-head">
           <h2>Bio</h2>
+          <button className="btn small" onClick={autoFillBio} disabled={bioBusy} title="Fill from fetched platform bios">
+            {bioBusy ? 'Filling…' : '✦ Auto-fill'}
+          </button>
         </div>
         <label className="cost-field block">
           <span>Creator name</span>
