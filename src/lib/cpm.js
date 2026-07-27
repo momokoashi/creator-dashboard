@@ -92,9 +92,11 @@ export function platformStats(creator, platformKey) {
   }
 
   // Sponsored vs organic: what does a branded post really do on this account?
-  // One tagged ad post is enough to start factoring (better than ignoring the
-  // user's tag entirely) — flagged low-confidence until there are 3+.
-  const sponsViews = eligible.filter(isSponsored).map((v) => Number(v.views));
+  // The factor is computed from their LAST 5 ads only (older ads reflect an
+  // older audience), and needs at least 2 ads — a single ad isn't a tight
+  // enough factor, so below 2 it stays blank (use the override box instead).
+  const sponsAll = eligible.filter(isSponsored);
+  const sponsViews = sponsAll.slice(0, 5).map((v) => Number(v.views));
   const organicViews = eligible.filter((v) => !isSponsored(v)).map((v) => Number(v.views));
   const sponsoredMedian = sponsViews.length ? median(sponsViews) : 0;
   const organicMedian = organicViews.length ? median(organicViews) : 0;
@@ -102,7 +104,7 @@ export function platformStats(creator, platformKey) {
   // for when the video list isn't available or you know the number already.
   const override = Number(p.adFactorOverride) || 0;
   const computedFactor =
-    sponsViews.length >= 1 && organicViews.length >= 2 && organicMedian > 0
+    sponsViews.length >= 2 && organicViews.length >= 2 && organicMedian > 0
       ? sponsoredMedian / organicMedian
       : null;
   const sponsoredFactor = override > 0 ? override : computedFactor;

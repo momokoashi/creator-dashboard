@@ -287,8 +287,12 @@ function PlatformCard({ p, creator, update }) {
         </p>
       ) : stats.sponsoredFactor != null ? (
         <p className="fineprint">
-          Sponsored posts ({stats.sponsoredCount}): median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs price paid posts at the sponsored median.
-          {stats.sponsoredLowConfidence ? ' Low confidence with under 3 tagged ads — tag more if you can.' : ''}
+          Last {stats.sponsoredCount} ads: median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs price paid posts at the ads' median.
+          {stats.sponsoredLowConfidence ? ' Low confidence with only 2 ads — tag more if you can.' : ''}
+        </p>
+      ) : stats.sponsoredCount === 1 ? (
+        <p className="fineprint">
+          Only 1 ad found — the factor needs at least 2 ads to be reliable, so it stays blank. Tag another ad in the list, or set the override box.
         </p>
       ) : null}
 
