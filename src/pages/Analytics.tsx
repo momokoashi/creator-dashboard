@@ -349,7 +349,7 @@ function VideoList({ videos, median, onTag }) {
                   <button
                     className={'tag-btn' + (sponsored ? ' tag-ad' : ' tag-org') + (manual ? ' tag-manual' : '')}
                     title={
-                      (sponsored ? 'Sponsored' : 'Organic') + (manual ? ' (tagged by hand)' : ' (auto-detected from caption)') +
+                      (sponsored ? 'Sponsored' : 'Organic') + (manual ? ' (tagged — by hand or platform disclosure label)' : ' (auto-detected from caption)') +
                       ' — click to change: auto → AD → organic → auto'
                     }
                     onClick={() => onTag && onTag(idx)}

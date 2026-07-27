@@ -13,8 +13,10 @@
 
 const FRESH_MS = 24 * 60 * 60 * 1000; // 24h — user-chosen cutoff
 
-// Caption markers that identify a sponsored/branded post.
-const SPONSORED_RE = /#ad\b|#sponsored\b|#sponsor\b|#gifted\b|#brandpartner\b|paid partnership|in partnership with|#partner\b/i;
+// Caption markers that identify a sponsored/branded post. Platform-level
+// disclosure flags (IG "Paid partnership" label, YouTube paid-promotion,
+// TikTok branded content) arrive from the server as v.sponsored === true.
+const SPONSORED_RE = /#ad\b|#sponsored\b|#sponsor\b|#gifted\b|#brandpartner\b|#brandambassador\b|paid partnership|in partnership with|#partner\b|use (?:my )?code\s+\w+|discount code/i;
 
 /**
  * Is this video sponsored? A manual tag (v.sponsored true/false, set by

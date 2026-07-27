@@ -116,9 +116,10 @@ app.get('/api/youtube/channel', async (req, res) => {
 
       if (videoIds.length === 0) break;
 
-      // Fetch statistics, snippet, AND contentDetails to get video duration
+      // statistics + snippet + contentDetails (duration) + paidProductPlacementDetails
+      // (the creator's own "contains paid promotion" disclosure flag)
       const detailsRes = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
-        params: { part: 'statistics,snippet,contentDetails', id: videoIds.join(','), key: apiKey }
+        params: { part: 'statistics,snippet,contentDetails,paidProductPlacementDetails', id: videoIds.join(','), key: apiKey }
       });
 
       // Keep original playlist order (newest first) by sorting by publish date
@@ -136,7 +137,9 @@ app.get('/api/youtube/channel', async (req, res) => {
           likes: parseInt(v.statistics.likeCount) || 0,
           comments: parseInt(v.statistics.commentCount) || 0,
           publishedAt: v.snippet.publishedAt,
-          videoId: v.id
+          videoId: v.id,
+          // Platform-level paid-promotion disclosure beats caption scanning
+          ...(v.paidProductPlacementDetails?.hasPaidProductPlacement ? { sponsored: true } : {})
         };
 
         if (seconds <= 180) {
@@ -273,7 +276,9 @@ app.get('/api/tiktok/profile', async (req, res) => {
         likes: v.digg_count || v.stats?.diggCount || 0,
         comments: v.comment_count || v.stats?.commentCount || 0,
         shares: v.share_count || v.stats?.shareCount || 0,
-        publishedAt: v.create_time ? new Date(v.create_time * 1000).toISOString() : null
+        publishedAt: v.create_time ? new Date(v.create_time * 1000).toISOString() : null,
+        // TikTok marks branded content on the video object where available
+        ...(v.is_ad === true || v.commerce_info?.branded_content_type > 0 ? { sponsored: true } : {})
       }));
 
     const followers = userStats?.followerCount || 0;
@@ -383,7 +388,9 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
           views: node.video_view_count || node.edge_media_preview_like?.count || node.edge_liked_by?.count || 0,
           likes: node.edge_media_preview_like?.count || node.edge_liked_by?.count || 0,
           comments: node.edge_media_to_comment?.count || 0,
-          publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null
+          publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null,
+          // Instagram's "Paid partnership" label lives in metadata, not the caption
+          ...(node.is_paid_partnership === true ? { sponsored: true } : {})
         };
       });
     console.log(`Instagram Looter: got ${posts.length} posts`);
@@ -427,7 +434,9 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
             views: m.play_count || m.view_count || 0,
             likes: m.like_count || 0,
             comments: m.comment_count || 0,
-            publishedAt: m.taken_at ? new Date(m.taken_at * 1000).toISOString() : null
+            publishedAt: m.taken_at ? new Date(m.taken_at * 1000).toISOString() : null,
+            // Instagram's "Paid partnership" label lives in metadata, not the caption
+            ...(m.is_paid_partnership === true || m.sponsor_tags?.length > 0 ? { sponsored: true } : {})
           };
         });
       console.log(`Instagram Looter: got ${reels.length} reels`);
@@ -485,7 +494,8 @@ async function fetchInstagramDirect(username) {
         likes: node.edge_liked_by?.count || 0,
         comments: node.edge_media_to_comment?.count || 0,
         publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null,
-        isVideo: !!node.is_video && node.video_view_count != null
+        isVideo: !!node.is_video && node.video_view_count != null,
+        ...(node.is_paid_partnership === true ? { sponsored: true } : {})
       };
     });
 
