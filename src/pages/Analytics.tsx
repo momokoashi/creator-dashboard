@@ -48,6 +48,7 @@ function toPatch(json, existing, useShorts) {
     // Full objects (title/date/likes), not just view counts, so the UI can
     // list the last 10 videos instead of a bare count.
     videos: videosToStore(videos),
+    viewsAreLikes: !!json.viewsAreLikes,
     fetchedAt: json.fetchedAt || Date.now(),
   };
 }
@@ -229,6 +230,13 @@ function PlatformCard({ p, creator, update }) {
           <span className="metric-value muted">{stats.count}</span>
         </div>
       </div>
+
+      {data.viewsAreLikes && (
+        <p className="error-text">
+          ⚠ No Reels found for this account — the numbers above are like-counts, not views.
+          The real median views are likely much higher; verify on the profile before pricing a deal.
+        </p>
+      )}
 
       <VideoList videos={data.videos} median={stats.median} />
 

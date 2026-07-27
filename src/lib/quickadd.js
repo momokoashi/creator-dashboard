@@ -61,6 +61,7 @@ export function platformPatchFromFetch(platform, json, existingPlatforms = {}) {
     engagementRate: json.engagementRate ?? 0,
     bio: json.bio || '',
     videos: videosToStore(json.videos),
+    viewsAreLikes: !!json.viewsAreLikes,
     fetchedAt: json.fetchedAt || Date.now(),
   };
   const patch = { [platform]: { ...(existingPlatforms[platform] || {}), ...base } };

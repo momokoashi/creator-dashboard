@@ -447,7 +447,13 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
     bio: (data.biography || '').substring(0, 300),
     followers: followers,
     engagementRate: parseFloat(engagementRate),
-    videos: posts,
+    // Reels carry real play counts; timeline posts only expose likes, which
+    // the mapper above falls back to. Feeding like-counts into the median
+    // massively understates reach (e.g. 88 "views" on a 2k-view account),
+    // so prefer reels whenever we got any.
+    videos: reels.length ? reels : posts,
+    viewsAreLikes: reels.length === 0,
+    posts: posts,
     reels: reels
   };
 }
@@ -477,7 +483,8 @@ async function fetchInstagramDirect(username) {
         views: node.video_view_count || node.edge_liked_by?.count || 0,
         likes: node.edge_liked_by?.count || 0,
         comments: node.edge_media_to_comment?.count || 0,
-        publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null
+        publishedAt: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1000).toISOString() : null,
+        isVideo: !!node.is_video && node.video_view_count != null
       };
     });
 
@@ -487,6 +494,11 @@ async function fetchInstagramDirect(username) {
     ? ((totalEngagement / posts.length / followers) * 100).toFixed(2)
     : 0;
 
+  // The direct web API has no separate reels endpoint. Prefer video posts
+  // (which carry real video_view_count) over photo posts whose "views" are
+  // actually like-counts; only fall back to the full list when there are no
+  // videos at all.
+  const videoPosts = posts.filter((p) => p.isVideo);
   return {
     platform: 'instagram',
     channelName: userData.full_name || username,
@@ -494,7 +506,8 @@ async function fetchInstagramDirect(username) {
     bio: (userData.biography || '').substring(0, 300),
     followers: followers,
     engagementRate: parseFloat(engagementRate),
-    videos: posts
+    videos: videoPosts.length ? videoPosts : posts,
+    viewsAreLikes: videoPosts.length === 0
   };
 }
 
