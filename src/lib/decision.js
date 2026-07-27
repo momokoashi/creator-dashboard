@@ -14,8 +14,26 @@
 
 import { platformStats, cpm, engagementFactor } from './cpm.js';
 
-/** Fallback target CPM ($) when none is set for a package's platform. */
+/** Last-resort fallback target CPM ($) for fields not in DEFAULT_TARGETS. */
 export const DEFAULT_TARGET_CPM = 40;
+
+// Per-platform defaults from the partnership playbook's Type 1 CPM table
+// (base / with-whitelisting). YT Shorts isn't listed there — it follows
+// YouTube. The +$5 search premium is added automatically from the fame
+// check; the +$5 expert premium stays a manual target adjustment.
+export const DEFAULT_TARGETS = {
+  targetCpmInstagram: 10,
+  targetCpmIgReels: 10,
+  targetCpmTiktok: 15,
+  targetCpmYoutube: 20,
+  targetCpmYtShorts: 20,
+  targetCpmPodcast: 20,
+  targetCpmInstagramWl: 30,
+  targetCpmIgReelsWl: 30,
+  targetCpmTiktokWl: 25,
+  targetCpmYoutubeWl: 30,
+  targetCpmYtShortsWl: 30,
+};
 
 // Each buyable package: which cost field, which platform's median views it earns,
 // and which target-CPM field governs it. Bundles sum multiple platforms.
@@ -95,7 +113,10 @@ function evaluatePackage(creator, pkg) {
   const { raw, adjusted, anyFactor, engFactor } = combinedViews(creator, pkg.platforms);
   // Price on what a *sponsored* post is expected to do, not the organic median.
   const dealViews = anyFactor ? adjusted : raw;
-  const baseTarget = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
+  // Playbook formula: Effective CPM = Base (+ WL) + Search + Expert.
+  // Search premium applies automatically once the fame check has run.
+  const searchPremium = creator.fame?.tier === 'premium' || creator.fame?.tier === 'celebrity' ? 5 : 0;
+  const baseTarget = (Number(targets[pkg.targetField]) || DEFAULT_TARGETS[pkg.targetField] || DEFAULT_TARGET_CPM) + searchPremium;
   // Poor engagement discounts what a thousand views is worth to us (up to
   // -10%); good engagement earns no premium.
   const target = Math.round(baseTarget * engFactor * 100) / 100;
@@ -110,13 +131,17 @@ function evaluatePackage(creator, pkg) {
     target,
     baseTarget,
     engFactor,
+    searchPremium,
     usingDefaultTarget: !targets[pkg.targetField],
     ...judge(cost, dealViews, target),
   }];
 
   const wlCost = pkg.wlField ? Number(costs[pkg.wlField]) || 0 : 0;
   if (wlCost > 0) {
-    const wlBaseTarget = Number(targets[pkg.wlTargetField]) || baseTarget;
+    const wlResolved = Number(targets[pkg.wlTargetField]) || DEFAULT_TARGETS[pkg.wlTargetField] || 0;
+    // baseTarget already carries the search premium; only add it when the WL
+    // target resolves on its own.
+    const wlBaseTarget = wlResolved > 0 ? wlResolved + searchPremium : baseTarget;
     const wlTarget = Math.round(wlBaseTarget * engFactor * 100) / 100;
     results.push({
       key: pkg.key + 'Wl',
@@ -168,6 +193,10 @@ export function evaluateDeal(creator) {
     reason = `All packages are 2×+ over target (best is ${best.label} at ${fmt(best.actualCpm)} CPM vs ${fmt(best.target)}). Pass or restructure to affiliate.`;
   } else {
     reason = `Add view data to compute a CPM for ${best.label}.`;
+  }
+
+  if (creator.fame?.tier === 'celebrity') {
+    reason += ' ⭐ Celebrity tier — the playbook prices these on fame, not formulas; escalate to leadership.';
   }
 
   return { packages, overall: { decision: best.decision, package: best, reason } };

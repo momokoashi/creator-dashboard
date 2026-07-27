@@ -3,23 +3,24 @@ import { platformStats, isSponsored } from '../lib/cpm.js';
 import { formatNumber } from '../lib/format.js';
 import { videosToStore, carryManualTags } from '../lib/quickadd.js';
 
-// Target CPM inputs — these replace the old CPM calculator.
+// Target CPM inputs — placeholders are the playbook's Type 1 base rates,
+// used automatically when the field is left blank.
 const TARGETS = [
-  ['targetCpmInstagram', 'IG Reel'],
-  ['targetCpmIgReels', 'IG Reels (pkg)'],
-  ['targetCpmTiktok', 'TikTok'],
-  ['targetCpmYoutube', 'YouTube'],
-  ['targetCpmYtShorts', 'YT Shorts'],
-  ['targetCpmPodcast', 'Podcast'],
+  ['targetCpmInstagram', 'IG Reel', '10'],
+  ['targetCpmIgReels', 'IG Reels (pkg)', '10'],
+  ['targetCpmTiktok', 'TikTok', '15'],
+  ['targetCpmYoutube', 'YouTube', '20'],
+  ['targetCpmYtShorts', 'YT Shorts', '20'],
+  ['targetCpmPodcast', 'Podcast', '20'],
 ];
 
 // With-usage-rights targets — govern the "+ WL" rows in Deal Analysis.
 const WL_TARGETS = [
-  ['targetCpmInstagramWl', 'IG Reel + WL'],
-  ['targetCpmIgReelsWl', 'IG Reels + WL'],
-  ['targetCpmTiktokWl', 'TikTok + WL'],
-  ['targetCpmYoutubeWl', 'YouTube + WL'],
-  ['targetCpmYtShortsWl', 'YT Shorts + WL'],
+  ['targetCpmInstagramWl', 'IG Reel + WL', '30'],
+  ['targetCpmIgReelsWl', 'IG Reels + WL', '30'],
+  ['targetCpmTiktokWl', 'TikTok + WL', '25'],
+  ['targetCpmYoutubeWl', 'YouTube + WL', '30'],
+  ['targetCpmYtShortsWl', 'YT Shorts + WL', '30'],
 ];
 
 // Platforms shown as analytics cards. `fetch` = endpoint config or null (manual only).
@@ -117,34 +118,34 @@ export default function Analytics({ creator, deal, update }: any) {
           </button>
         </div>
         <div className="cost-grid">
-          {TARGETS.map(([field, label]) => (
+          {TARGETS.map(([field, label, ph]) => (
             <label key={field} className="cost-field">
               <span>{label}</span>
               <input
-                type="number" min="0" placeholder="40"
+                type="number" min="0" placeholder={ph}
                 value={creator.targetCpms?.[field] || ''}
                 onChange={(e) => setTarget(field, e.target.value)}
               />
             </label>
           ))}
         </div>
-        <p className="fineprint">Blank = uses the $40 default in Deal Analysis.</p>
+        <p className="fineprint">Blank = playbook default (shown greyed). The +$5 search premium adds automatically when the fame check finds one; add the +$5 expert premium by typing base + 5 here.</p>
         <div className="card-head" style={{ marginTop: 14 }}>
           <h2>With usage rights <span className="muted">· governs "+ WL" rows</span></h2>
         </div>
         <div className="cost-grid">
-          {WL_TARGETS.map(([field, label]) => (
+          {WL_TARGETS.map(([field, label, ph]) => (
             <label key={field} className="cost-field">
               <span>{label}</span>
               <input
-                type="number" min="0" placeholder="same as base"
+                type="number" min="0" placeholder={ph}
                 value={creator.targetCpms?.[field] || ''}
                 onChange={(e) => setTarget(field, e.target.value)}
               />
             </label>
           ))}
         </div>
-        <p className="fineprint">Blank = falls back to the base target for that platform.</p>
+        <p className="fineprint">Blank = playbook default (shown greyed).</p>
         {allErr && <p className="error-text">{allErr}</p>}
       </div>
 

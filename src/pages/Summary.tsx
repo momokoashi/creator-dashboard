@@ -155,8 +155,11 @@ export default function Summary({ creator, deal, update }) {
                     {formatNumber(p.medianViews)}{p.sponsoredAdjusted ? '†' : ''}
                   </td>
                   <td className="hi">{formatCpm(p.actualCpm)}</td>
-                  <td title={p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? `Base target ${formatCpm(p.baseTarget)} × ${p.engFactor.toFixed(2)} engagement quality` : undefined}>
-                    {formatCpm(p.target)}{p.usingDefaultTarget ? '*' : ''}{p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? '‡' : ''}
+                  <td title={[
+                    p.searchPremium ? `includes +$${p.searchPremium} search premium (fame check)` : null,
+                    p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? `base ${formatCpm(p.baseTarget)} × ${p.engFactor.toFixed(2)} engagement quality` : null,
+                  ].filter(Boolean).join(' · ') || undefined}>
+                    {formatCpm(p.target)}{p.usingDefaultTarget ? '*' : ''}{p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? '‡' : ''}{p.searchPremium ? '§' : ''}
                   </td>
                   <td>{formatMoney(p.counterPrice)}</td>
                   <td><span className={'pill pill-' + p.decision.toLowerCase()}>{p.decision}</span></td>
@@ -167,7 +170,7 @@ export default function Summary({ creator, deal, update }) {
         ) : (
           <p className="muted">Enter platform costs below and view data on the Analytics tab to see CPMs.</p>
         )}
-        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views priced at the sponsored-post median (what an #ad really does on this account, not the organic median). ‡ target discounted up to 10% for poor engagement (hover for the math — good engagement earns no premium). Average &amp; min views are on the Analytics tab.</p>
+        <p className="fineprint">* using the playbook default for that platform (IG $10 · TikTok $15 · YT/Podcast $20 · WL $30/$25) — set per-creator targets on the Analytics tab. † views priced at the sponsored-post median. ‡ target discounted up to 10% for poor engagement. § includes the +$5 search premium from the fame check. Hover a target for the math.</p>
       </div>
 
       <OutcomesCard creator={creator} update={update} />
