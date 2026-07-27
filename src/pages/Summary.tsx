@@ -121,6 +121,7 @@ export default function Summary({ creator, deal, update }) {
             );
           })}
         </div>
+        <FameCheck creator={creator} update={update} />
       </div>
 
       {/* ---- Decision (the headline) ---- */}
@@ -150,7 +151,9 @@ export default function Summary({ creator, deal, update }) {
                 <tr key={p.key} className={'row-' + p.decision.toLowerCase()}>
                   <td>{p.label}</td>
                   <td>{formatMoney(p.cost)}</td>
-                  <td className="hi">{formatNumber(p.medianViews)}</td>
+                  <td className="hi" title={p.sponsoredAdjusted ? `Organic median ${formatNumber(p.rawMedianViews)}, scaled by the ad factor` : undefined}>
+                    {formatNumber(p.medianViews)}{p.sponsoredAdjusted ? '†' : ''}
+                  </td>
                   <td className="hi">{formatCpm(p.actualCpm)}</td>
                   <td>{formatCpm(p.target)}{p.usingDefaultTarget ? '*' : ''}</td>
                   <td>{formatMoney(p.counterPrice)}</td>
@@ -162,8 +165,10 @@ export default function Summary({ creator, deal, update }) {
         ) : (
           <p className="muted">Enter platform costs below and view data on the Analytics tab to see CPMs.</p>
         )}
-        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. Average &amp; min views are shown there as secondary metrics.</p>
+        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views adjusted by the sponsored-post factor (their #ad posts underperform organic, so we price on what an ad will really do). Average &amp; min views are on the Analytics tab.</p>
       </div>
+
+      <OutcomesCard creator={creator} update={update} />
 
       {/* ---- Platform costs ---- */}
       <div className="card">
@@ -237,6 +242,145 @@ function OverrideControl({ creator, update }) {
           onChange={(e) => update({ override: { ...o, note: e.target.value } })}
         />
       )}
+    </div>
+  );
+}
+
+// Fame check — automates the playbook's search-volume premium rules via
+// the server's Wikipedia proxy. Result is cached on the creator record.
+function FameCheck({ creator, update }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const fame = creator.fame;
+
+  async function check() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch(`/api/fame?name=${encodeURIComponent(creator.name)}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Check failed');
+      update({ fame: { ...json, checkedAt: Date.now() } });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fame">
+      <div className="fame-row">
+        {fame ? (
+          <span className={'pill pill-' + (fame.tier === 'celebrity' ? 'pass' : fame.tier === 'premium' ? 'counter' : 'accept')}>
+            {fame.tier === 'celebrity' ? '⭐ CELEBRITY — escalate' : fame.tier === 'premium' ? '+$5 search premium' : 'No search premium'}
+          </span>
+        ) : (
+          <span className="muted small">Search-volume premium not checked</span>
+        )}
+        <button className="btn tiny" onClick={check} disabled={busy || !creator.name}>
+          {busy ? 'Checking…' : fame ? '↻ Re-check' : '✦ Check fame'}
+        </button>
+      </div>
+      {fame?.note && <p className="fineprint">{fame.note}{fame.url ? <> · <a className="fame-link" href={fame.url} target="_blank" rel="noreferrer">Wikipedia ↗</a></> : null}</p>}
+      {err && <p className="error-text">{err}</p>}
+    </div>
+  );
+}
+
+// Deal outcomes — what actually happened after we paid. Realized CPM and
+// ROAS per deal close the loop on the predictions above (playbook rule:
+// keep the relationship when videos clear 1.8 ROAS).
+function OutcomesCard({ creator, update }) {
+  const [form, setForm] = useState({ label: '', paid: '', views: '', revenue: '' });
+  const outcomes = creator.outcomes || [];
+
+  function addOutcome() {
+    const paid = Number(form.paid) || 0;
+    if (!form.label.trim() || paid <= 0) return;
+    update({
+      outcomes: [
+        ...outcomes,
+        {
+          at: Date.now(),
+          label: form.label.trim(),
+          paid,
+          views: Number(form.views) || 0,
+          revenue: Number(form.revenue) || 0,
+        },
+      ],
+    });
+    setForm({ label: '', paid: '', views: '', revenue: '' });
+  }
+
+  function removeOutcome(at) {
+    update({ outcomes: outcomes.filter((o) => o.at !== at) });
+  }
+
+  const totals = outcomes.reduce(
+    (t, o) => ({ paid: t.paid + o.paid, views: t.views + o.views, revenue: t.revenue + o.revenue }),
+    { paid: 0, views: 0, revenue: 0 }
+  );
+  const realizedCpm = totals.views > 0 ? (totals.paid / totals.views) * 1000 : null;
+  const realizedRoas = totals.paid > 0 && totals.revenue > 0 ? totals.revenue / totals.paid : null;
+
+  return (
+    <div className="card wide">
+      <div className="card-head">
+        <h2>Deal Outcomes <span className="muted">· what actually happened · keep at 1.8+ ROAS</span></h2>
+        {outcomes.length > 0 && (
+          <span className="muted small">
+            Realized CPM {formatCpm(realizedCpm)}
+            {realizedRoas != null && (
+              <> · ROAS <strong className={realizedRoas >= 1.8 ? 'views-hi' : 'views-lo'}>{realizedRoas.toFixed(2)}</strong></>
+            )}
+          </span>
+        )}
+      </div>
+
+      {outcomes.length > 0 && (
+        <table className="deal-table">
+          <thead>
+            <tr><th>Date</th><th>Deal</th><th>Paid</th><th>Actual views</th><th>Realized CPM</th><th>Revenue</th><th>ROAS</th><th></th></tr>
+          </thead>
+          <tbody>
+            {outcomes.map((o) => {
+              const rCpm = o.views > 0 ? (o.paid / o.views) * 1000 : null;
+              const roas = o.paid > 0 && o.revenue > 0 ? o.revenue / o.paid : null;
+              return (
+                <tr key={o.at}>
+                  <td className="muted">{new Date(o.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</td>
+                  <td>{o.label}</td>
+                  <td>{formatMoney(o.paid)}</td>
+                  <td>{o.views ? formatNumber(o.views) : '—'}</td>
+                  <td>{formatCpm(rCpm)}</td>
+                  <td>{o.revenue ? formatMoney(o.revenue) : '—'}</td>
+                  <td>
+                    {roas == null ? '—' : (
+                      <span className={'pill ' + (roas >= 1.8 ? 'pill-accept' : 'pill-pass')}>{roas.toFixed(2)}</span>
+                    )}
+                  </td>
+                  <td><button className="creator-del" title="Remove" onClick={() => removeOutcome(o.at)}>×</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+
+      <div className="outcome-form">
+        <input placeholder="Deal (e.g. 1x Reel, June)" value={form.label}
+          onChange={(e) => setForm({ ...form, label: e.target.value })} />
+        <input type="number" min="0" placeholder="Paid $" value={form.paid}
+          onChange={(e) => setForm({ ...form, paid: e.target.value })} />
+        <input type="number" min="0" placeholder="Actual views" value={form.views}
+          onChange={(e) => setForm({ ...form, views: e.target.value })} />
+        <input type="number" min="0" placeholder="Revenue $ (optional)" value={form.revenue}
+          onChange={(e) => setForm({ ...form, revenue: e.target.value })} />
+        <button className="btn small primary" onClick={addOutcome} disabled={!form.label.trim() || !(Number(form.paid) > 0)}>
+          + Log deal
+        </button>
+      </div>
+      <p className="fineprint">Log each finished deal: what you paid, the views the post actually got, and tracked revenue (code redemptions / affiliate). Over time this shows the creator's realized CPM vs the predictions above.</p>
     </div>
   );
 }

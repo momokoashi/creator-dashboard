@@ -167,6 +167,25 @@ input, textarea, .bio { font-family: inherit; }
 .manual-views summary { cursor: pointer; }
 .manual-views label { margin-top: 8px; }
 
+/* ---- Fame check ---- */
+.fame { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.fame-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fame-link { color: var(--accent-2); }
+
+/* ---- Deal outcomes ---- */
+.outcome-form { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; margin-top: 12px; }
+.outcome-form input {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px; min-width: 0;
+}
+.outcome-form input:focus { outline: none; border-color: var(--accent); }
+@media (max-width: 820px) { .outcome-form { grid-template-columns: 1fr 1fr; } }
+
+/* ---- Metric extras ---- */
+.metric-value.small-value { font-size: 15px; }
+.metric .views-hi { color: var(--green); }
+.metric .views-lo { color: var(--red); }
+
 /* ---- Reply attachments ---- */
 .attach-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
 .attach-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }

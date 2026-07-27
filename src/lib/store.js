@@ -50,6 +50,9 @@ function migrate(c) {
     // v2 additions:
     override: c.override || null, // { decision, note } manual brand-fit override
     conversations: c.conversations || [], // saved reply threads
+    // v2.1 additions:
+    outcomes: c.outcomes || [], // completed deals: { at, label, paid, views, revenue }
+    fame: c.fame || null, // cached /api/fame result { tier, monthlyViews, title, checkedAt }
     ...c,
   };
 }

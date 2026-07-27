@@ -101,10 +101,11 @@ app.get('/api/youtube/channel', async (req, res) => {
     let videos = [];
     let shorts = [];
     let nextPageToken = null;
-    const maxPages = 4; // Up to 200 results to ensure 10 of each type
+    const maxPages = 4; // Up to 200 results to ensure 20 of each type
 
+    // 20 per type: the newest 10 drive the median, 11-20 drive the trend.
     for (let page = 0; page < maxPages; page++) {
-      if (videos.length >= 10 && shorts.length >= 10) break;
+      if (videos.length >= 20 && shorts.length >= 20) break;
 
       const playlistParams = { part: 'contentDetails', playlistId: uploadsPlaylistId, maxResults: 50, key: apiKey };
       if (nextPageToken) playlistParams.pageToken = nextPageToken;
@@ -139,9 +140,9 @@ app.get('/api/youtube/channel', async (req, res) => {
         };
 
         if (seconds <= 180) {
-          if (shorts.length < 10) shorts.push(item);
+          if (shorts.length < 20) shorts.push(item);
         } else {
-          if (videos.length < 10) videos.push(item);
+          if (videos.length < 20) videos.push(item);
         }
       }
 
@@ -253,7 +254,7 @@ app.get('/api/tiktok/profile', async (req, res) => {
 
     // Get user videos
     const videosRes = await axios.get('https://tiktok-scraper7.p.rapidapi.com/user/posts', {
-      params: { unique_id: cleanUsername, count: 15 },
+      params: { unique_id: cleanUsername, count: 30 },
       headers: {
         'x-rapidapi-key': rapidApiKey,
         'x-rapidapi-host': 'tiktok-scraper7.p.rapidapi.com'
@@ -262,10 +263,10 @@ app.get('/api/tiktok/profile', async (req, res) => {
 
     const rawVideos = videosRes.data?.data?.videos || [];
 
-    // Filter out pinned videos and take last 10
+    // Filter out pinned videos; keep 20 (newest 10 = median, 11-20 = trend)
     const videos = rawVideos
       .filter(v => !v.is_top) // is_top = pinned
-      .slice(0, 10)
+      .slice(0, 20)
       .map(v => ({
         title: v.title || 'Untitled',
         views: v.play_count || v.stats?.playCount || 0,
@@ -373,7 +374,7 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
   if (rawPosts.length > 0) {
     posts = rawPosts
       .filter(p => !p.node?.pinned_for_users?.length)
-      .slice(0, 10)
+      .slice(0, 12)
       .map(p => {
         const node = p.node;
         const caption = node.edge_media_to_caption?.edges?.[0]?.node?.text || '';
@@ -417,7 +418,7 @@ async function fetchInstagramViaLooter(username, rapidApiKey) {
             || m.pinned_for_users?.length > 0;
           return !pinned;
         })
-        .slice(0, 10)
+        .slice(0, 20)
         .map(item => {
           const m = item.media || item;
           const caption = m.caption?.text || '';
@@ -685,6 +686,77 @@ app.post('/api/bio', async (req, res) => {
   } catch (err) {
     console.error('AI bio error:', err.message);
     res.json({ bio: fallback, source: 'raw', note: err.message });
+  }
+});
+
+// ============================================================
+// Fame check — automates the playbook's premium rules:
+//   5k+ searches (or recent TV)  -> +$5 search premium
+//   15k+ searches                -> celebrity, escalate to leadership
+// Google doesn't expose search volume freely, so we proxy it with
+// Wikipedia: having an article at all ≈ notable (premium tier), and
+// heavy monthly pageviews ≈ celebrity tier. It's a proxy — the UI
+// labels it as a suggestion, not a verdict.
+// ============================================================
+app.get('/api/fame', async (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: 'name parameter required' });
+  if (tryCache(req, res, 'fame:' + name.toLowerCase())) return;
+
+  try {
+    // 1. Find their Wikipedia article (if any)
+    const search = await axios.get('https://en.wikipedia.org/w/api.php', {
+      params: { action: 'query', list: 'search', srsearch: name, srlimit: 1, format: 'json' },
+      headers: { 'User-Agent': 'creator-dashboard/2.0 (partnerships tool)' },
+      timeout: 10000
+    });
+    const hit = search.data?.query?.search?.[0];
+
+    // Require the article title to actually contain the person's name parts,
+    // otherwise "Jane Smith" matches some unrelated article.
+    const nameParts = String(name).toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const titleLc = (hit?.title || '').toLowerCase();
+    const matched = hit && nameParts.length > 0 && nameParts.every(w => titleLc.includes(w));
+
+    if (!matched) {
+      return sendCached(res, 'fame:' + name.toLowerCase(), {
+        found: false, tier: 'none',
+        note: 'No Wikipedia article found — no automatic search premium. (A strong TV moment in the last 3 months can still qualify; check manually.)'
+      });
+    }
+
+    // 2. Monthly pageviews for that article (last full 2 months, averaged)
+    const end = new Date();
+    end.setDate(1); // first of this month
+    const start = new Date(end); start.setMonth(start.getMonth() - 2);
+    const fmt = (d) => d.toISOString().slice(0, 10).replace(/-/g, '');
+    const title = encodeURIComponent(hit.title.replace(/ /g, '_'));
+    let monthlyViews = 0;
+    try {
+      const pv = await axios.get(
+        `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${title}/monthly/${fmt(start)}/${fmt(end)}`,
+        { headers: { 'User-Agent': 'creator-dashboard/2.0 (partnerships tool)' }, timeout: 10000 }
+      );
+      const items = pv.data?.items || [];
+      if (items.length) monthlyViews = Math.round(items.reduce((s, i) => s + i.views, 0) / items.length);
+    } catch { /* pageviews API can 404 for brand-new articles; article alone still counts */ }
+
+    // 3. Map to the playbook tiers (Wikipedia views run below Google searches,
+    // so thresholds are set conservatively lower than 5k/15k).
+    const tier = monthlyViews >= 30000 ? 'celebrity' : 'premium';
+    sendCached(res, 'fame:' + name.toLowerCase(), {
+      found: true,
+      title: hit.title,
+      url: 'https://en.wikipedia.org/wiki/' + hit.title.replace(/ /g, '_'),
+      monthlyViews,
+      tier,
+      note: tier === 'celebrity'
+        ? `~${monthlyViews.toLocaleString()} Wikipedia views/month — likely 15k+ searches. Treat as Type 2 celebrity: price on fame, escalate to leadership.`
+        : `Has a Wikipedia article (~${monthlyViews.toLocaleString()} views/month) — likely clears 5k searches. Apply the +$5 search premium.`
+    });
+  } catch (err) {
+    console.error('Fame check error:', err.message);
+    res.status(500).json({ error: 'Fame check failed: ' + err.message });
   }
 });
 

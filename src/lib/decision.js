@@ -33,9 +33,23 @@ const PACKAGES = [
   { key: 'bundleAll', label: 'Full Bundle (All)',  costField: 'costBundleAll', platforms: ['instagram', 'tiktok', 'youtube', 'youtubeShorts'], targetField: 'targetCpmInstagram', wlField: 'wlBundle', wlTargetField: 'targetCpmInstagramWl' },
 ];
 
-/** Sum of median views across one or more platforms. */
-function combinedMedian(creator, platforms) {
-  return platforms.reduce((sum, pk) => sum + platformStats(creator, pk).median, 0);
+/**
+ * Combined view stats across one or more platforms.
+ * `adjusted` scales each platform's median by its sponsored-post factor
+ * (what a branded post really does vs organic) when one is measurable —
+ * that's the number a paid deal should be priced on.
+ */
+function combinedViews(creator, platforms) {
+  let raw = 0;
+  let adjusted = 0;
+  let anyFactor = false;
+  for (const pk of platforms) {
+    const s = platformStats(creator, pk);
+    raw += s.median;
+    if (s.sponsoredFactor != null) anyFactor = true;
+    adjusted += s.median * (s.sponsoredFactor ?? 1);
+  }
+  return { raw, adjusted: Math.round(adjusted), anyFactor };
 }
 
 /** Score one price against a target CPM on the median views seen. */
@@ -65,17 +79,21 @@ function evaluatePackage(creator, pkg) {
   const cost = Number(costs[pkg.costField]) || 0;
   if (cost <= 0) return [];
 
-  const medianViews = combinedMedian(creator, pkg.platforms);
+  const { raw, adjusted, anyFactor } = combinedViews(creator, pkg.platforms);
+  // Price on what a *sponsored* post is expected to do, not the organic median.
+  const dealViews = anyFactor ? adjusted : raw;
   const target = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
 
   const results = [{
     key: pkg.key,
     label: pkg.label,
     cost,
-    medianViews,
+    medianViews: dealViews,
+    rawMedianViews: raw,
+    sponsoredAdjusted: anyFactor,
     target,
     usingDefaultTarget: !targets[pkg.targetField],
-    ...judge(cost, medianViews, target),
+    ...judge(cost, dealViews, target),
   }];
 
   const wlCost = pkg.wlField ? Number(costs[pkg.wlField]) || 0 : 0;
@@ -85,10 +103,12 @@ function evaluatePackage(creator, pkg) {
       key: pkg.key + 'Wl',
       label: pkg.label + ' + WL',
       cost: cost + wlCost,
-      medianViews,
+      medianViews: dealViews,
+      rawMedianViews: raw,
+      sponsoredAdjusted: anyFactor,
       target: wlTarget,
       usingDefaultTarget: !targets[pkg.wlTargetField] && !targets[pkg.targetField],
-      ...judge(cost + wlCost, medianViews, wlTarget),
+      ...judge(cost + wlCost, dealViews, wlTarget),
     });
   }
 

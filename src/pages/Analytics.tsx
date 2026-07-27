@@ -231,6 +231,44 @@ function PlatformCard({ p, creator, update }) {
         </div>
       </div>
 
+      <div className="metrics">
+        <div className="metric" title="Median views ÷ followers. Under ~5% suggests a dead or bought following; well over 100% means they outperform their size.">
+          <span className="metric-label">Reach rate</span>
+          <span className={'metric-value ' + (stats.reachRate == null ? 'muted' : stats.reachRate < 5 ? 'views-lo' : 'views-hi')}>
+            {stats.reachRate == null ? '—' : stats.reachRate.toFixed(0) + '%'}
+          </span>
+        </div>
+        <div className="metric" title="Median of the newest videos vs the ones before them. Falling = you're buying yesterday's reach.">
+          <span className="metric-label">Trend</span>
+          <span className={'metric-value ' + (stats.trendPct == null ? 'muted' : stats.trendPct < -10 ? 'views-lo' : stats.trendPct > 10 ? 'views-hi' : '')}>
+            {stats.trendPct == null ? '—' : (stats.trendPct > 0 ? '↗ +' : stats.trendPct < 0 ? '↘ ' : '→ ') + stats.trendPct.toFixed(0) + '%'}
+          </span>
+        </div>
+        <div className="metric" title="Where 8 of the 10 videos land (best and worst dropped). A wide range = volatile — write a minimum-view floor into the deal.">
+          <span className="metric-label">Typical range</span>
+          <span className="metric-value muted small-value">
+            {stats.count >= 5 ? `${formatNumber(stats.typicalLow)}–${formatNumber(stats.typicalHigh)}` : '—'}
+          </span>
+        </div>
+        <div className="metric" title="Median views of their #ad posts ÷ organic median. Below 1× = sponsored posts underperform; the Deal Analysis prices on this.">
+          <span className="metric-label">Ad factor</span>
+          <span className={'metric-value ' + (stats.sponsoredFactor == null ? 'muted' : stats.sponsoredFactor < 0.85 ? 'views-lo' : 'views-hi')}>
+            {stats.sponsoredFactor == null ? '—' : stats.sponsoredFactor.toFixed(2) + '×'}
+          </span>
+        </div>
+      </div>
+
+      {stats.freshSkipped > 0 && (
+        <p className="fineprint">
+          Excluded {stats.freshSkipped} post{stats.freshSkipped > 1 ? 's' : ''} under 24h old (views still accruing).
+        </p>
+      )}
+      {stats.sponsoredFactor != null && (
+        <p className="fineprint">
+          Sponsored posts ({stats.sponsoredCount}): median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs use the adjusted number.
+        </p>
+      )}
+
       {data.viewsAreLikes && (
         <p className="error-text">
           ⚠ No Reels found for this account — the numbers above are like-counts, not views.
