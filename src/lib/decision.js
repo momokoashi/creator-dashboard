@@ -60,7 +60,7 @@ function combinedViews(creator, platforms) {
     adjusted: Math.round(adjusted),
     anyFactor,
     // Average engagement-quality multiplier across the package's platforms
-    // (neutral 1 where no rate is known). Flexes the target CPM ±15%.
+    // (neutral 1 where no rate is known). Discount-only: 0.9-1.0.
     engFactor: engN ? engSum / engN : 1,
   };
 }
@@ -96,7 +96,8 @@ function evaluatePackage(creator, pkg) {
   // Price on what a *sponsored* post is expected to do, not the organic median.
   const dealViews = anyFactor ? adjusted : raw;
   const baseTarget = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
-  // Engagement quality flexes what a thousand views is worth to us (±15%).
+  // Poor engagement discounts what a thousand views is worth to us (up to
+  // -10%); good engagement earns no premium.
   const target = Math.round(baseTarget * engFactor * 100) / 100;
 
   const results = [{

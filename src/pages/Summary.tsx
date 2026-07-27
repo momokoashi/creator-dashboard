@@ -167,7 +167,7 @@ export default function Summary({ creator, deal, update }) {
         ) : (
           <p className="muted">Enter platform costs below and view data on the Analytics tab to see CPMs.</p>
         )}
-        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views priced at the sponsored-post median (what an #ad really does on this account, not the organic median). ‡ target flexed ±15% for engagement quality (hover for the math). Average &amp; min views are on the Analytics tab.</p>
+        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views priced at the sponsored-post median (what an #ad really does on this account, not the organic median). ‡ target discounted up to 10% for poor engagement (hover for the math — good engagement earns no premium). Average &amp; min views are on the Analytics tab.</p>
       </div>
 
       <OutcomesCard creator={creator} update={update} />

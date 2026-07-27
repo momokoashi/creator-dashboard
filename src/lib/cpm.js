@@ -129,24 +129,26 @@ export function platformStats(creator, platformKey) {
 }
 
 // ============================================================
-// Engagement quality — flexes what we're willing to pay per view.
+// Engagement quality — discount-only adjustment on the target CPM.
+// Poor engagement knocks up to 10% off what we'll pay per view; good
+// engagement earns no premium (we don't pay extra for likes — reach is
+// the primary axis and strong engagement is simply expected).
 // Baselines differ because each platform's rate is computed differently
 // at fetch time (IG: engagement/followers; TikTok & YouTube: engagement/views).
-// Maps to a bounded 0.85x–1.15x multiplier on the target CPM.
 // ============================================================
 const ENG_BASELINES = {
-  instagram: { poor: 1, great: 4 },
-  tiktok: { poor: 3, great: 8 },
-  youtube: { poor: 2, great: 6 },
-  youtubeShorts: { poor: 2, great: 6 },
+  instagram: { poor: 1, healthy: 2.5 },
+  tiktok: { poor: 3, healthy: 5 },
+  youtube: { poor: 2, healthy: 4 },
+  youtubeShorts: { poor: 2, healthy: 4 },
 };
 
 export function engagementFactor(platformKey, rate) {
   const b = ENG_BASELINES[platformKey];
   if (!b || !rate || rate <= 0) return 1;
-  if (rate <= b.poor) return 0.85;
-  if (rate >= b.great) return 1.15;
-  return 0.85 + ((rate - b.poor) / (b.great - b.poor)) * 0.3;
+  if (rate <= b.poor) return 0.9;
+  if (rate >= b.healthy) return 1;
+  return 0.9 + ((rate - b.poor) / (b.healthy - b.poor)) * 0.1;
 }
 
 /**
