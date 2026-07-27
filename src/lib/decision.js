@@ -12,7 +12,7 @@
 //   any ACCEPT -> ACCEPT that package · else any COUNTER -> COUNTER · else PASS
 // ============================================================
 
-import { platformStats, cpm } from './cpm.js';
+import { platformStats, cpm, engagementFactor } from './cpm.js';
 
 /** Fallback target CPM ($) when none is set for a package's platform. */
 export const DEFAULT_TARGET_CPM = 40;
@@ -43,13 +43,26 @@ function combinedViews(creator, platforms) {
   let raw = 0;
   let adjusted = 0;
   let anyFactor = false;
+  let engSum = 0;
+  let engN = 0;
   for (const pk of platforms) {
     const s = platformStats(creator, pk);
     raw += s.median;
     if (s.sponsoredFactor != null) anyFactor = true;
-    adjusted += s.median * (s.sponsoredFactor ?? 1);
+    // dealViews = the sponsored posts' own median when measurable, else the
+    // overall median — the direct estimate of what a paid post will do.
+    adjusted += s.dealViews;
+    engSum += engagementFactor(pk, s.engagementRate);
+    engN++;
   }
-  return { raw, adjusted: Math.round(adjusted), anyFactor };
+  return {
+    raw,
+    adjusted: Math.round(adjusted),
+    anyFactor,
+    // Average engagement-quality multiplier across the package's platforms
+    // (neutral 1 where no rate is known). Flexes the target CPM ±15%.
+    engFactor: engN ? engSum / engN : 1,
+  };
 }
 
 /** Score one price against a target CPM on the median views seen. */
@@ -79,10 +92,12 @@ function evaluatePackage(creator, pkg) {
   const cost = Number(costs[pkg.costField]) || 0;
   if (cost <= 0) return [];
 
-  const { raw, adjusted, anyFactor } = combinedViews(creator, pkg.platforms);
+  const { raw, adjusted, anyFactor, engFactor } = combinedViews(creator, pkg.platforms);
   // Price on what a *sponsored* post is expected to do, not the organic median.
   const dealViews = anyFactor ? adjusted : raw;
-  const target = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
+  const baseTarget = Number(targets[pkg.targetField]) || DEFAULT_TARGET_CPM;
+  // Engagement quality flexes what a thousand views is worth to us (±15%).
+  const target = Math.round(baseTarget * engFactor * 100) / 100;
 
   const results = [{
     key: pkg.key,
@@ -92,13 +107,16 @@ function evaluatePackage(creator, pkg) {
     rawMedianViews: raw,
     sponsoredAdjusted: anyFactor,
     target,
+    baseTarget,
+    engFactor,
     usingDefaultTarget: !targets[pkg.targetField],
     ...judge(cost, dealViews, target),
   }];
 
   const wlCost = pkg.wlField ? Number(costs[pkg.wlField]) || 0 : 0;
   if (wlCost > 0) {
-    const wlTarget = Number(targets[pkg.wlTargetField]) || target;
+    const wlBaseTarget = Number(targets[pkg.wlTargetField]) || baseTarget;
+    const wlTarget = Math.round(wlBaseTarget * engFactor * 100) / 100;
     results.push({
       key: pkg.key + 'Wl',
       label: pkg.label + ' + WL',
@@ -107,6 +125,8 @@ function evaluatePackage(creator, pkg) {
       rawMedianViews: raw,
       sponsoredAdjusted: anyFactor,
       target: wlTarget,
+      baseTarget: wlBaseTarget,
+      engFactor,
       usingDefaultTarget: !targets[pkg.wlTargetField] && !targets[pkg.targetField],
       ...judge(cost + wlCost, dealViews, wlTarget),
     });

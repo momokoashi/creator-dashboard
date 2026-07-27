@@ -92,11 +92,15 @@ export function platformStats(creator, platformKey) {
   }
 
   // Sponsored vs organic: what does a branded post really do on this account?
+  // One tagged ad post is enough to start factoring (better than ignoring the
+  // user's tag entirely) — flagged low-confidence until there are 3+.
   const sponsViews = eligible.filter(isSponsored).map((v) => Number(v.views));
   const organicViews = eligible.filter((v) => !isSponsored(v)).map((v) => Number(v.views));
+  const sponsoredMedian = sponsViews.length ? median(sponsViews) : 0;
+  const organicMedian = organicViews.length ? median(organicViews) : 0;
   const sponsoredFactor =
-    sponsViews.length >= 2 && organicViews.length >= 2 && median(organicViews) > 0
-      ? median(sponsViews) / median(organicViews)
+    sponsViews.length >= 1 && organicViews.length >= 2 && organicMedian > 0
+      ? sponsoredMedian / organicMedian
       : null;
 
   const followers = Number(p.followers) || 0;
@@ -113,10 +117,36 @@ export function platformStats(creator, platformKey) {
     trendPct,
     reachRate: followers > 0 && med > 0 ? (med / followers) * 100 : null,
     sponsoredFactor,
+    sponsoredLowConfidence: sponsoredFactor != null && sponsViews.length < 3,
     sponsoredCount: sponsViews.length,
-    sponsoredMedian: sponsViews.length ? median(sponsViews) : 0,
-    organicMedian: organicViews.length ? median(organicViews) : 0,
+    sponsoredMedian,
+    organicMedian,
+    // What to price a paid post on: the sponsored posts' own median when we
+    // have one (the direct evidence), else the overall median.
+    dealViews: sponsoredFactor != null ? sponsoredMedian : med,
+    engagementRate: Number(p.engagementRate) || 0,
   };
+}
+
+// ============================================================
+// Engagement quality — flexes what we're willing to pay per view.
+// Baselines differ because each platform's rate is computed differently
+// at fetch time (IG: engagement/followers; TikTok & YouTube: engagement/views).
+// Maps to a bounded 0.85x–1.15x multiplier on the target CPM.
+// ============================================================
+const ENG_BASELINES = {
+  instagram: { poor: 1, great: 4 },
+  tiktok: { poor: 3, great: 8 },
+  youtube: { poor: 2, great: 6 },
+  youtubeShorts: { poor: 2, great: 6 },
+};
+
+export function engagementFactor(platformKey, rate) {
+  const b = ENG_BASELINES[platformKey];
+  if (!b || !rate || rate <= 0) return 1;
+  if (rate <= b.poor) return 0.85;
+  if (rate >= b.great) return 1.15;
+  return 0.85 + ((rate - b.poor) / (b.great - b.poor)) * 0.3;
 }
 
 /**

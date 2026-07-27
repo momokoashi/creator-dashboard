@@ -155,7 +155,9 @@ export default function Summary({ creator, deal, update }) {
                     {formatNumber(p.medianViews)}{p.sponsoredAdjusted ? '†' : ''}
                   </td>
                   <td className="hi">{formatCpm(p.actualCpm)}</td>
-                  <td>{formatCpm(p.target)}{p.usingDefaultTarget ? '*' : ''}</td>
+                  <td title={p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? `Base target ${formatCpm(p.baseTarget)} × ${p.engFactor.toFixed(2)} engagement quality` : undefined}>
+                    {formatCpm(p.target)}{p.usingDefaultTarget ? '*' : ''}{p.engFactor && Math.abs(p.engFactor - 1) > 0.001 ? '‡' : ''}
+                  </td>
                   <td>{formatMoney(p.counterPrice)}</td>
                   <td><span className={'pill pill-' + p.decision.toLowerCase()}>{p.decision}</span></td>
                 </tr>
@@ -165,7 +167,7 @@ export default function Summary({ creator, deal, update }) {
         ) : (
           <p className="muted">Enter platform costs below and view data on the Analytics tab to see CPMs.</p>
         )}
-        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views adjusted by the sponsored-post factor (their #ad posts underperform organic, so we price on what an ad will really do). Average &amp; min views are on the Analytics tab.</p>
+        <p className="fineprint">* using default target ($40). Set per-platform targets on the Analytics tab. † views priced at the sponsored-post median (what an #ad really does on this account, not the organic median). ‡ target flexed ±15% for engagement quality (hover for the math). Average &amp; min views are on the Analytics tab.</p>
       </div>
 
       <OutcomesCard creator={creator} update={update} />

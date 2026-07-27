@@ -263,8 +263,8 @@ function PlatformCard({ p, creator, update }) {
             {stats.count >= 5 ? `${formatNumber(stats.typicalLow)}–${formatNumber(stats.typicalHigh)}` : '—'}
           </span>
         </div>
-        <div className="metric" title="Median views of their #ad posts ÷ organic median. Below 1× = sponsored posts underperform; the Deal Analysis prices on this.">
-          <span className="metric-label">Ad factor</span>
+        <div className="metric" title="Median views of their #ad posts ÷ organic median. Below 1× = sponsored posts underperform; the Deal Analysis prices on the sponsored median.">
+          <span className="metric-label">Ad factor{stats.sponsoredFactor != null ? ` (n=${stats.sponsoredCount})` : ''}</span>
           <span className={'metric-value ' + (stats.sponsoredFactor == null ? 'muted' : stats.sponsoredFactor < 0.85 ? 'views-lo' : 'views-hi')}>
             {stats.sponsoredFactor == null ? '—' : stats.sponsoredFactor.toFixed(2) + '×'}
           </span>
@@ -278,7 +278,8 @@ function PlatformCard({ p, creator, update }) {
       )}
       {stats.sponsoredFactor != null && (
         <p className="fineprint">
-          Sponsored posts ({stats.sponsoredCount}): median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs use the adjusted number.
+          Sponsored posts ({stats.sponsoredCount}): median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs price paid posts at the sponsored median.
+          {stats.sponsoredLowConfidence ? ' Low confidence with under 3 tagged ads — tag more if you can.' : ''}
         </p>
       )}
 
