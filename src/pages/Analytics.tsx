@@ -212,7 +212,7 @@ function PlatformCard({ p, creator, update }) {
         )}
       </div>
 
-      <div className="stat-row">
+      <div className="stat-row stat-row-3">
         <label className="cost-field">
           <span>Followers</span>
           <input type="number" min="0" value={data.followers || ''}
@@ -222,6 +222,11 @@ function PlatformCard({ p, creator, update }) {
           <span>Engagement %</span>
           <input type="number" min="0" step="0.01" value={data.engagementRate || ''}
             onChange={(e) => patchPlatform({ engagementRate: Number(e.target.value) || 0 })} />
+        </label>
+        <label className="cost-field" title="Set the ad factor by hand (e.g. 0.6 = their sponsored posts get 60% of organic views). Overrides tag-based detection. Blank = automatic.">
+          <span>Ad factor override</span>
+          <input type="number" min="0" step="0.05" placeholder="auto" value={data.adFactorOverride || ''}
+            onChange={(e) => patchPlatform({ adFactorOverride: Number(e.target.value) || 0 })} />
         </label>
       </div>
 
@@ -263,8 +268,8 @@ function PlatformCard({ p, creator, update }) {
             {stats.count >= 5 ? `${formatNumber(stats.typicalLow)}–${formatNumber(stats.typicalHigh)}` : '—'}
           </span>
         </div>
-        <div className="metric" title="Median views of their #ad posts ÷ organic median. Below 1× = sponsored posts underperform; the Deal Analysis prices on the sponsored median.">
-          <span className="metric-label">Ad factor{stats.sponsoredFactor != null ? ` (n=${stats.sponsoredCount})` : ''}</span>
+        <div className="metric" title="Median views of their #ad posts ÷ organic median. Below 1× = sponsored posts underperform; the Deal Analysis prices on the sponsored median. Set by hand with the override box above.">
+          <span className="metric-label">Ad factor{stats.sponsoredManual ? ' (manual)' : stats.sponsoredFactor != null ? ` (n=${stats.sponsoredCount})` : ''}</span>
           <span className={'metric-value ' + (stats.sponsoredFactor == null ? 'muted' : stats.sponsoredFactor < 0.85 ? 'views-lo' : 'views-hi')}>
             {stats.sponsoredFactor == null ? '—' : stats.sponsoredFactor.toFixed(2) + '×'}
           </span>
@@ -276,12 +281,16 @@ function PlatformCard({ p, creator, update }) {
           Excluded {stats.freshSkipped} post{stats.freshSkipped > 1 ? 's' : ''} under 24h old (views still accruing).
         </p>
       )}
-      {stats.sponsoredFactor != null && (
+      {stats.sponsoredManual ? (
+        <p className="fineprint">
+          Manual ad factor {stats.sponsoredFactor.toFixed(2)}× — paid posts priced at {formatNumber(stats.median)} × {stats.sponsoredFactor.toFixed(2)} = {formatNumber(Math.round(stats.median * stats.sponsoredFactor))} views. Clear the override box to go back to automatic.
+        </p>
+      ) : stats.sponsoredFactor != null ? (
         <p className="fineprint">
           Sponsored posts ({stats.sponsoredCount}): median {formatNumber(stats.sponsoredMedian)} vs organic {formatNumber(stats.organicMedian)} — deal CPMs price paid posts at the sponsored median.
           {stats.sponsoredLowConfidence ? ' Low confidence with under 3 tagged ads — tag more if you can.' : ''}
         </p>
-      )}
+      ) : null}
 
       {data.viewsAreLikes && (
         <p className="error-text">

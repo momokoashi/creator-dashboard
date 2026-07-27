@@ -98,10 +98,15 @@ export function platformStats(creator, platformKey) {
   const organicViews = eligible.filter((v) => !isSponsored(v)).map((v) => Number(v.views));
   const sponsoredMedian = sponsViews.length ? median(sponsViews) : 0;
   const organicMedian = organicViews.length ? median(organicViews) : 0;
-  const sponsoredFactor =
+  // A hand-typed override (the "Ad factor override" box) beats everything —
+  // for when the video list isn't available or you know the number already.
+  const override = Number(p.adFactorOverride) || 0;
+  const computedFactor =
     sponsViews.length >= 1 && organicViews.length >= 2 && organicMedian > 0
       ? sponsoredMedian / organicMedian
       : null;
+  const sponsoredFactor = override > 0 ? override : computedFactor;
+  const sponsoredManual = override > 0;
 
   const followers = Number(p.followers) || 0;
 
@@ -117,13 +122,15 @@ export function platformStats(creator, platformKey) {
     trendPct,
     reachRate: followers > 0 && med > 0 ? (med / followers) * 100 : null,
     sponsoredFactor,
-    sponsoredLowConfidence: sponsoredFactor != null && sponsViews.length < 3,
+    sponsoredManual,
+    sponsoredLowConfidence: !sponsoredManual && sponsoredFactor != null && sponsViews.length < 3,
     sponsoredCount: sponsViews.length,
     sponsoredMedian,
     organicMedian,
-    // What to price a paid post on: the sponsored posts' own median when we
-    // have one (the direct evidence), else the overall median.
-    dealViews: sponsoredFactor != null ? sponsoredMedian : med,
+    // What to price a paid post on: a manual override scales the median;
+    // tagged posts use their own median (the direct evidence); else the
+    // overall median unchanged.
+    dealViews: sponsoredManual ? Math.round(med * override) : sponsoredFactor != null ? sponsoredMedian : med,
     engagementRate: Number(p.engagementRate) || 0,
   };
 }
